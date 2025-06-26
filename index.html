@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids Bank</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Kids Bank</h1>
+
+        <div class="all-accounts-controls">
+            <button id="expand-all-btn">Expand All</button>
+            <button id="collapse-all-btn">Collapse All</button>
+        </div>
+
+        <div id="accounts-container"></div>
+
+        <div class="settings-box">
+            <div class="settings-header" id="toggle-settings-btn">
+                <h2>Settings</h2>
+            </div>
+            <div class="settings-content">
+                <div class="data-section">
+                    <h2>Data Management</h2>
+                    <button id="export-btn">Export Data</button>
+                    <input type="file" id="import-file" accept=".json">
+                    <button id="import-btn">Import Data</button>
+                </div>
+
+                <div class="account-section">
+                    <h2>Add Account</h2>
+                    <div class="account-controls">
+                        <input type="text" id="account-name" placeholder="New account name">
+                        <input type="file" id="account-image" accept="image/*">
+                        <button id="add-account-btn">Add Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
