@@ -1,18 +1,18 @@
 {
   "name": "Kids Bank",
   "short_name": "KidsBank",
-  "start_url": "/index.html",
+  "start_url": "/banky/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007bff",
   "icons": [
     {
-      "src": "images/icon-192x192.png",
+      "src": "banky/images/icon-192x192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "images/icon-512x512.png",
+      "src": "banky/images/icon-512x512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
