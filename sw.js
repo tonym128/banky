@@ -1,11 +1,11 @@
 const CACHE_NAME = 'kids-bank-cache-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/images/icon-192x192.png',
-  '/images/icon-512x512.png'
+  '/banky/',
+  '/banky/index.html',
+  '/banky/styles.css',
+  '/banky/app.js',
+  '/banky/images/icon-192x192.png',
+  '/banky/images/icon-512x512.png'
 ];
 
 self.addEventListener('install', event => {
