@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountsContainer = document.getElementById('accounts-container');
     const expandAllBtn = document.getElementById('expand-all-btn');
     const collapseAllBtn = document.getElementById('collapse-all-btn');
-    const settingsHeader = document.querySelector('.settings-header');
     const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
     const settingsContent = document.querySelector('.settings-content');
 
