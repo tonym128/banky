@@ -190,6 +190,61 @@ button:hover {
     margin-bottom: 20px;
 }
 
-.settings-content {
+
+.settings-container {
+    position: relative;
+    display: inline-block;
+}
+
+#settings-btn {
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.context-menu {
     display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 220px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+.context-menu h3 {
+    margin-top: 0;
+    color: #0056b3;
+}
+
+.context-menu .all-accounts-controls,
+.context-menu .data-section,
+.context-menu .account-section {
+    margin-bottom: 10px;
+}
+
+.context-menu .account-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.context-menu button, .context-menu input {
+    width: 100%;
+}
+
+.close-btn {
+    float: right;
+    font-size: 20px;
+    font-weight: bold;
+    text-decoration: none;
+    color: #aaa;
+}
+
+.close-btn:hover {
+    color: black;
 }

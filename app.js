@@ -8,17 +8,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountsContainer = document.getElementById('accounts-container');
     const expandAllBtn = document.getElementById('expand-all-btn');
     const collapseAllBtn = document.getElementById('collapse-all-btn');
-    const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
-    const settingsContent = document.querySelector('.settings-content');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsMenu = document.getElementById('settings-menu');
+    const accountContextMenu = document.getElementById('account-context-menu');
+    const removeAccountLink = document.getElementById('remove-account-link');
 
     let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
     let charts = {};
+    let currentAccountId = null;
 
     function saveState() {
         localStorage.setItem('accounts', JSON.stringify(accounts));
     }
-
-    
 
     function renderAccounts() {
         accountsContainer.innerHTML = '';
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const account = accounts[id];
             const accountBox = document.createElement('div');
             accountBox.classList.add('account-box');
+            accountBox.dataset.accountId = id;
 
             const header = document.createElement('div');
             header.classList.add('account-header');
@@ -250,6 +252,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    accountsContainer.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const accountBox = e.target.closest('.account-box');
+        if (accountBox) {
+            currentAccountId = accountBox.dataset.accountId;
+            accountContextMenu.style.display = 'block';
+            accountContextMenu.style.left = `${e.pageX}px`;
+            accountContextMenu.style.top = `${e.pageY}px`;
+            settingsMenu.style.display = 'none';
+        }
+    });
+
+    removeAccountLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentAccountId && confirm('Are you sure you want to remove this account?')) {
+            delete accounts[currentAccountId];
+            saveState();
+            renderAll();
+        }
+        accountContextMenu.style.display = 'none';
+    });
+
     exportBtn.addEventListener('click', () => {
         const data = JSON.stringify(accounts, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
@@ -279,8 +303,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    toggleSettingsBtn.addEventListener('click', () => {
-        settingsContent.style.display = settingsContent.style.display === 'none' ? 'block' : 'none';
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsMenu.style.display = 'block';
+        accountContextMenu.style.display = 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!settingsMenu.contains(e.target) && !settingsBtn.contains(e.target)) {
+            settingsMenu.style.display = 'none';
+        }
+        if (!accountContextMenu.contains(e.target)) {
+            accountContextMenu.style.display = 'none';
+        }
     });
 
     function renderAll() {
