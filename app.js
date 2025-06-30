@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsMenu = document.getElementById('settings-menu');
     const accountContextMenu = document.getElementById('account-context-menu');
     const removeAccountLink = document.getElementById('remove-account-link');
-    const logo = document.getElementById('logo');
 
     let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
     let charts = {};
@@ -317,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderAll() {
         const activeAccountIds = [...document.querySelectorAll('.account-box.active')].map(box => box.dataset.accountId);
         renderAccounts();
-        logo.src = 'images/logo.svg';
         activeAccountIds.forEach(id => {
             const accountBox = document.querySelector(`.account-box[data-account-id="${id}"]`);
             if (accountBox) {
