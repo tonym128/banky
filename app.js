@@ -278,6 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     importBtn.addEventListener('click', () => {
+        importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', () => {
         const file = importFileInput.files[0];
         if (file) {
             const reader = new FileReader();
