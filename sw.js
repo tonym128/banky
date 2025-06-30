@@ -4,8 +4,12 @@ const urlsToCache = [
   '/banky/index.html',
   '/banky/styles.css',
   '/banky/app.js',
-  '/banky/images/icon-192x192.png',
-  '/banky/images/icon-512x512.png'
+  '/banky/android-chrome-192x192.png',
+  '/banky/android-chrome-512x512.png'
+  '/banky/favicon.ico'
+  '/banky/favicon-16x16.png'
+  '/banky/favicon-32x32.png'
+  '/banky/android-touch-icon.png'
 ];
 
 self.addEventListener('install', event => {
