@@ -6,12 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const importBtn = document.getElementById('import-btn');
     const importFileInput = document.getElementById('import-file');
     const accountsContainer = document.getElementById('accounts-container');
-    const expandAllBtn = document.getElementById('expand-all-btn');
-    const collapseAllBtn = document.getElementById('collapse-all-btn');
+    
     const settingsBtn = document.getElementById('settings-btn');
     const settingsMenu = document.getElementById('settings-menu');
     const accountContextMenu = document.getElementById('account-context-menu');
     const removeAccountLink = document.getElementById('remove-account-link');
+    const logo = document.getElementById('logo');
 
     let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
     let charts = {};
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 imageHtml = `<img src="${account.image}" class="account-summary-image">`;
             }
             const balance = account.transactions.reduce((sum, tx) => sum + tx.amount, 0);
-            header.innerHTML = `${imageHtml}<strong>${account.name}</strong> - Balance: ${balance.toFixed(2)}`;
+            header.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
             header.addEventListener('click', () => {
                 accountBox.classList.toggle('active');
             });
@@ -206,15 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    expandAllBtn.addEventListener('click', () => {
-        const accountBoxes = document.querySelectorAll('.account-box');
-        accountBoxes.forEach(box => box.classList.add('active'));
-    });
-
-    collapseAllBtn.addEventListener('click', () => {
-        const accountBoxes = document.querySelectorAll('.account-box');
-        accountBoxes.forEach(box => box.classList.remove('active'));
-    });
+    
 
     addAccountBtn.addEventListener('click', () => {
         const name = accountNameInput.value.trim();
@@ -260,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
             accountContextMenu.style.display = 'block';
             accountContextMenu.style.left = `${e.pageX}px`;
             accountContextMenu.style.top = `${e.pageY}px`;
-            settingsMenu.style.display = 'none';
+            settingsMenu.classList.remove('show');
         }
     });
 
@@ -305,13 +297,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        settingsMenu.style.display = 'block';
+        settingsMenu.classList.toggle('show');
         accountContextMenu.style.display = 'none';
     });
 
     document.addEventListener('click', (e) => {
         if (!settingsMenu.contains(e.target) && !settingsBtn.contains(e.target)) {
-            settingsMenu.style.display = 'none';
+            settingsMenu.classList.remove('show');
         }
         if (!accountContextMenu.contains(e.target)) {
             accountContextMenu.style.display = 'none';
@@ -319,7 +311,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderAll() {
+        const activeAccountIds = [...document.querySelectorAll('.account-box.active')].map(box => box.dataset.accountId);
         renderAccounts();
+        logo.src = 'images/logo.svg';
+        activeAccountIds.forEach(id => {
+            const accountBox = document.querySelector(`.account-box[data-account-id="${id}"]`);
+            if (accountBox) {
+                accountBox.classList.add('active');
+            }
+        });
     }
 
     renderAll();

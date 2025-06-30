@@ -10,34 +10,34 @@
 </head>
 <body>
     <div class="container">
-        <h1>Kids Bank</h1>
-
-        <div id="accounts-container"></div>
-
-        <div class="settings-container">
-            <button id="settings-btn">Settings</button>
-            <div id="settings-menu" class="context-menu">
-                <a href="#" class="close-btn">&times;</a>
-                <div class="all-accounts-controls">
-                    <button id="expand-all-btn">Expand All</button>
-                    <button id="collapse-all-btn">Collapse All</button>
-                </div>
-                <div class="data-section">
-                    <h3>Data Management</h3>
-                    <button id="export-btn">Export Data</button>
-                    <input type="file" id="import-file" accept=".json">
-                    <button id="import-btn">Import Data</button>
-                </div>
-                <div class="account-section">
-                    <h3>Add Account</h3>
-                    <div class="account-controls">
-                        <input type="text" id="account-name" placeholder="New account name">
-                        <input type="file" id="account-image" accept="image/*">
-                        <button id="add-account-btn">Add Account</button>
+        <div class="header-container">
+            <img id="logo" src="" alt="Kids Bank Logo" />
+            <h1>Kids Bank</h1>
+            <div class="settings-container">
+                <button id="settings-btn">&#9776;</button>
+                <div id="settings-menu" class="context-menu">
+                    <a href="#" class="close-btn">&times;</a>
+                    
+                    <div class="data-section">
+                        <h3>Data Management</h3>
+                        <button id="export-btn">Export Data</button>
+                        <input type="file" id="import-file" accept=".json">
+                        <button id="import-btn">Import Data</button>
+                    </div>
+                    <div class="account-section">
+                        <h3>Add Account</h3>
+                        <div class="account-controls">
+                            <input type="text" id="account-name" placeholder="New account name">
+                            <input type="file" id="account-image" accept="image/*">
+                            <button id="add-account-btn">Add Account</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div id="accounts-container"></div>
+
         <div id="account-context-menu" class="context-menu">
             <a href="#" id="remove-account-link">Remove Account</a>
         </div>

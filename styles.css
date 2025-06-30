@@ -102,11 +102,7 @@ button:hover {
     background-color: #e0a800;
 }
 
-.all-accounts-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-}
+
 
 .account-box {
     margin-bottom: 20px;
@@ -191,29 +187,45 @@ button:hover {
 }
 
 
+.header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+#logo {
+    width: 50px;
+    height: 50px;
+}
+
 .settings-container {
     position: relative;
     display: inline-block;
 }
 
 #settings-btn {
-    padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
+    background: none;
     border: none;
-    border-radius: 4px;
+    font-size: 24px;
     cursor: pointer;
+    color: #0056b3;
 }
 
 .context-menu {
     display: none;
     position: absolute;
+    right: 0;
     background-color: #f9f9f9;
     min-width: 220px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 1;
     border-radius: 5px;
     padding: 10px;
+}
+
+.context-menu.show {
+    display: block;
 }
 
 .context-menu h3 {
