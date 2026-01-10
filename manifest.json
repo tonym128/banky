@@ -16,5 +16,7 @@
       "type": "image/png",
       "sizes": "512x512"
     }
-  ]
+  ],
+  "id": "KidsBank100",
+  "description": "An application to manage your childrens bank accounts with a parent. Whenever they earn some money you can add it here, whenever they spend some money you can add it here. It tracks the transactions in a database and can give transactional details as well as a spending overview for the last 90 days."
 }
