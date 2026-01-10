@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsMenu = document.getElementById('settings-menu');
     const accountContextMenu = document.getElementById('account-context-menu');
     const removeAccountLink = document.getElementById('remove-account-link');
+    const addEditImageLink = document.getElementById('add-edit-image-link');
+    const removeImageLink = document.getElementById('remove-image-link');
+    const editAccountImageInput = document.getElementById('edit-account-image');
 
     let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
     let charts = {};
@@ -297,6 +300,35 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll();
         }
         accountContextMenu.style.display = 'none';
+    });
+
+    addEditImageLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        editAccountImageInput.click();
+        accountContextMenu.style.display = 'none';
+    });
+
+    removeImageLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentAccountId && accounts[currentAccountId].image) {
+            delete accounts[currentAccountId].image;
+            saveState();
+            renderAll();
+        }
+        accountContextMenu.style.display = 'none';
+    });
+
+    editAccountImageInput.addEventListener('change', () => {
+        const file = editAccountImageInput.files[0];
+        if (file && currentAccountId) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                accounts[currentAccountId].image = e.target.result;
+                saveState();
+                renderAll();
+            };
+            reader.readAsDataURL(file);
+        }
     });
 
     exportBtn.addEventListener('click', () => {
