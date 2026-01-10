@@ -23,9 +23,8 @@
                     
                     <div class="data-section">
                         <h3>Data Management</h3>
-                        <button id="export-btn">Export Data</button>
+                        <button id="set-sync-file-btn">Set Sync File</button>
                         <input type="file" id="import-file" accept=".json" style="display: none;">
-                        <button id="import-btn">Import Data</button>
                         <div class="auto-sync-container">
                             <label for="auto-sync-toggle">Auto-sync to disk</label>
                             <input type="checkbox" id="auto-sync-toggle">
@@ -54,6 +53,7 @@
         </div>
     </div>
 
+    <script src="idb.js"></script>
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {

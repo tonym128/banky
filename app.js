@@ -1,9 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const addAccountBtn = document.getElementById('add-account-btn');
     const accountNameInput = document.getElementById('account-name');
     const accountImageInput = document.getElementById('account-image');
-    const exportBtn = document.getElementById('export-btn');
-    const importBtn = document.getElementById('import-btn');
+    const setSyncFileBtn = document.getElementById('set-sync-file-btn');
     const importFileInput = document.getElementById('import-file');
     const accountsContainer = document.getElementById('accounts-container');
     const autoSyncToggle = document.getElementById('auto-sync-toggle');
@@ -20,8 +19,73 @@ document.addEventListener('DOMContentLoaded', () => {
     let charts = {};
     let currentAccountId = null;
     let autoSyncEnabled = JSON.parse(localStorage.getItem('autoSyncEnabled')) || false;
+    let fileHandle = null;
 
     autoSyncToggle.checked = autoSyncEnabled;
+
+    const fsaSupported = 'showOpenFilePicker' in window;
+
+    if (!fsaSupported) {
+        setSyncFileBtn.textContent = 'Export';
+        const importBtn = document.createElement('button');
+        importBtn.textContent = 'Import';
+        importBtn.addEventListener('click', () => importFileInput.click());
+        setSyncFileBtn.insertAdjacentElement('afterend', importBtn);
+    }
+
+    async function loadInitialFile() {
+        if (!fsaSupported) return;
+        fileHandle = await get('fileHandle');
+        if (fileHandle) {
+            if (await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted') {
+                await loadData();
+            }
+        }
+    }
+
+    async function loadData() {
+        if (!fileHandle) return;
+        try {
+            const file = await fileHandle.getFile();
+            const contents = await file.text();
+            if (contents) {
+                accounts = JSON.parse(contents);
+                renderAll();
+            }
+        } catch (error) {
+            console.error('Failed to load data:', error);
+            alert('Failed to load data from the sync file.');
+        }
+    }
+
+    async function setSyncFile() {
+        if (!fsaSupported) {
+            const data = JSON.stringify(accounts, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kids-bank-data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            return;
+        }
+
+        try {
+            [fileHandle] = await window.showOpenFilePicker({
+                types: [{
+                    description: 'JSON Files',
+                    accept: { 'application/json': ['.json'] }
+                }]
+            });
+            await set('fileHandle', fileHandle);
+            await loadData();
+        } catch (error) {
+            console.error('Failed to set sync file:', error);
+        }
+    }
+
+    setSyncFileBtn.addEventListener('click', setSyncFile);
 
     function debounce(func, delay) {
         let timeout;
@@ -32,16 +96,34 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const autoExport = debounce(() => {
+    const autoExport = debounce(async () => {
         if (!autoSyncEnabled) return;
-        const data = JSON.stringify(accounts, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'kids-bank-data.json';
-        a.click();
-        URL.revokeObjectURL(url);
+        if (fsaSupported && fileHandle) {
+            if (await fileHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+                if (await fileHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+                    alert('Permission to write to the file was denied.');
+                    return;
+                }
+            }
+            try {
+                const writable = await fileHandle.createWritable();
+                await writable.write(JSON.stringify(accounts, null, 2));
+                await writable.close();
+            } catch (error) {
+                console.error('Failed to auto-sync to file:', error);
+                alert('Failed to auto-sync to file. Please ensure the file is not open in another program.');
+            }
+        } else {
+             // Fallback for non-FSA browsers
+            const data = JSON.stringify(accounts, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kids-bank-data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
     }, 1500);
 
     function saveState() {
@@ -49,11 +131,32 @@ document.addEventListener('DOMContentLoaded', () => {
         autoExport();
     }
 
-    autoSyncToggle.addEventListener('change', () => {
+    autoSyncToggle.addEventListener('change', async () => {
         autoSyncEnabled = autoSyncToggle.checked;
         localStorage.setItem('autoSyncEnabled', JSON.stringify(autoSyncEnabled));
         if (autoSyncEnabled) {
+            if (fsaSupported && !fileHandle) {
+                await setSyncFile();
+            }
             saveState();
+        }
+    });
+
+    importFileInput.addEventListener('change', () => {
+        const file = importFileInput.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedAccounts = JSON.parse(e.target.result);
+                    accounts = importedAccounts;
+                    saveState();
+                    renderAll();
+                } catch (error) {
+                    alert('Invalid JSON file.');
+                }
+            };
+            reader.readAsText(file);
         }
     });
 
@@ -331,39 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    exportBtn.addEventListener('click', () => {
-        const data = JSON.stringify(accounts, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'kids-bank-data.json';
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    importBtn.addEventListener('click', () => {
-        importFileInput.click();
-    });
-
-    importFileInput.addEventListener('change', () => {
-        const file = importFileInput.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const importedAccounts = JSON.parse(e.target.result);
-                    accounts = importedAccounts;
-                    saveState();
-                    renderAll();
-                } catch (error) {
-                    alert('Invalid JSON file.');
-                }
-            };
-            reader.readAsText(file);
-        }
-    });
-
     settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         settingsMenu.classList.toggle('show');
@@ -390,5 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    renderAll();
+    loadInitialFile().then(() => {
+        renderAll();
+    });
 });
