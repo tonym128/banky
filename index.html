@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kids Bank</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" sizes="180x180" href="banky/apple-touch-icon.png">
@@ -12,47 +13,67 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="header-container">
-            <img id="logo" src="images/banky.png" alt="Kids Bank Logo" />
-            <h1>Kids Bank</h1>
-            <div class="settings-container">
-                <button id="settings-btn">&#9776;</button>
-                <div id="settings-menu" class="context-menu">
-                    <a href="#" class="close-btn">&times;</a>
-                    
-                    <div class="data-section">
-                        <h3>Data Management</h3>
-                        <button id="set-sync-file-btn">Set Sync File</button>
-                        <input type="file" id="import-file" accept=".json" style="display: none;">
-                        <div class="auto-sync-container">
-                            <label for="auto-sync-toggle">Auto-sync to disk</label>
-                            <input type="checkbox" id="auto-sync-toggle">
-                        </div>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <img id="logo" src="images/banky.png" alt="Kids Bank Logo" style="width: 50px; height: 50px;" />
+                <h1 class="d-inline-block ms-2">Kids Bank</h1>
+            </div>
+            <button id="settings-btn" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#settings-modal">&#9776;</button>
+        </div>
+
+        <div id="accounts-container" class="accordion"></div>
+
+        <!-- Settings Modal -->
+        <div class="modal fade" id="settings-modal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="account-section">
-                        <h3>Add Account</h3>
-                        <div class="account-controls">
-                            <input type="text" id="account-name" placeholder="New account name">
-                            <label for="account-image">Avatar:</label>
-                            <input type="file" id="account-image" accept="image/*">
-                            <button id="add-account-btn">Add Account</button>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <h3>Data Management</h3>
+                            <button id="set-sync-file-btn" class="btn btn-primary">Set Sync File</button>
+                            <input type="file" id="import-file" accept=".json" style="display: none;">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="auto-sync-toggle">
+                                <label class="form-check-label" for="auto-sync-toggle">Auto-sync to disk</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <h3>Add Account</h3>
+                            <input type="text" id="account-name" class="form-control mb-2" placeholder="New account name">
+                            <label for="account-image" class="form-label">Avatar:</label>
+                            <input type="file" id="account-image" class="form-control" accept="image/*">
+                            <button id="add-account-btn" class="btn btn-success mt-2">Add Account</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div id="accounts-container"></div>
-
-        <div id="account-context-menu" class="context-menu">
-            <a href="#" id="add-edit-image-link">Add/Edit Image</a>
-            <a href="#" id="remove-image-link">Remove Image</a>
-            <a href="#" id="remove-account-link">Remove Account</a>
-            <input type="file" id="edit-account-image" accept="image/*" style="display: none;">
+        <!-- Account Context Menu Modal -->
+        <div class="modal fade" id="account-context-menu" tabindex="-1" aria-labelledby="accountContextMenuLabel" aria-hidden="true">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="accountContextMenuLabel">Account Actions</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <a href="#" id="add-edit-image-link" class="d-block mb-2">Add/Edit Image</a>
+                        <a href="#" id="remove-image-link" class="d-block mb-2">Remove Image</a>
+                        <a href="#" id="remove-account-link" class="d-block text-danger">Remove Account</a>
+                        <input type="file" id="edit-account-image" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="idb.js"></script>
     <script src="app.js"></script>
     <script>

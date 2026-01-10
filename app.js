@@ -6,10 +6,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const importFileInput = document.getElementById('import-file');
     const accountsContainer = document.getElementById('accounts-container');
     const autoSyncToggle = document.getElementById('auto-sync-toggle');
-    
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsMenu = document.getElementById('settings-menu');
-    const accountContextMenu = document.getElementById('account-context-menu');
+
+    const settingsModal = new bootstrap.Modal(document.getElementById('settings-modal'));
+    const accountContextMenu = new bootstrap.Modal(document.getElementById('account-context-menu'));
+
     const removeAccountLink = document.getElementById('remove-account-link');
     const addEditImageLink = document.getElementById('add-edit-image-link');
     const removeImageLink = document.getElementById('remove-image-link');
@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setSyncFileBtn.textContent = 'Export';
         const importBtn = document.createElement('button');
         importBtn.textContent = 'Import';
+        importBtn.className = 'btn btn-secondary';
         importBtn.addEventListener('click', () => importFileInput.click());
         setSyncFileBtn.insertAdjacentElement('afterend', importBtn);
     }
@@ -114,7 +115,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Failed to auto-sync to file. Please ensure the file is not open in another program.');
             }
         } else {
-             // Fallback for non-FSA browsers
             const data = JSON.stringify(accounts, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -165,41 +165,70 @@ document.addEventListener('DOMContentLoaded', async () => {
         for (const id in accounts) {
             const account = accounts[id];
             const accountBox = document.createElement('div');
-            accountBox.classList.add('account-box');
+            accountBox.className = 'accordion-item';
             accountBox.dataset.accountId = id;
 
-            const header = document.createElement('div');
-            header.classList.add('account-header');
+            const header = document.createElement('h2');
+            header.className = 'accordion-header';
+            header.id = `heading-${id}`;
+
+            const button = document.createElement('button');
+            button.className = 'accordion-button collapsed';
+            button.type = 'button';
+            button.dataset.bsToggle = 'collapse';
+            button.dataset.bsTarget = `#collapse-${id}`;
+            button.setAttribute('aria-expanded', 'false');
+            button.setAttribute('aria-controls', `collapse-${id}`);
+
             let imageHtml = '';
             if (account.image) {
-                imageHtml = `<img src="${account.image}" class="account-summary-image">`;
+                imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-2" style="width: 30px; height: 30px;">`;
             }
             const balance = account.transactions.reduce((sum, tx) => sum + tx.amount, 0);
-            header.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
-            header.addEventListener('click', () => {
-                accountBox.classList.toggle('active');
+            button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
+
+            button.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                currentAccountId = id;
+                accountContextMenu.show();
             });
+
+            header.appendChild(button);
             accountBox.appendChild(header);
 
+            const contentContainer = document.createElement('div');
+            contentContainer.id = `collapse-${id}`;
+            contentContainer.className = 'accordion-collapse collapse';
+            contentContainer.setAttribute('aria-labelledby', `heading-${id}`);
+            contentContainer.dataset.bsParent = '#accounts-container';
+
             const content = document.createElement('div');
-            content.classList.add('account-content');
+            content.className = 'accordion-body';
 
             const earnSpendSection = document.createElement('div');
-            earnSpendSection.classList.add('earn-spend-section');
+            earnSpendSection.className = 'row';
             earnSpendSection.innerHTML = `
-                <div class="earn-box">
-                    <h2>Earn</h2>
-                    <input type="date" id="earn-date-${id}">
-                    <input type="text" id="earn-description-${id}" placeholder="Description">
-                    <input type="number" id="earn-amount-${id}" placeholder="Amount">
-                    <button id="earn-btn-${id}">Save</button>
+                <div class="col-md-6">
+                    <div class="card bg-success-subtle mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Earn</h5>
+                            <input type="date" id="earn-date-${id}" class="form-control mb-2">
+                            <input type="text" id="earn-description-${id}" class="form-control mb-2" placeholder="Description">
+                            <input type="number" id="earn-amount-${id}" class="form-control mb-2" placeholder="Amount">
+                            <button id="earn-btn-${id}" class="btn btn-success">Save</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="spend-box">
-                    <h2>Spend</h2>
-                    <input type="date" id="spend-date-${id}">
-                    <input type="text" id="spend-description-${id}" placeholder="Description">
-                    <input type="number" id="spend-amount-${id}" placeholder="Amount">
-                    <button id="spend-btn-${id}">Save</button>
+                <div class="col-md-6">
+                    <div class="card bg-danger-subtle mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Spend</h5>
+                            <input type="date" id="spend-date-${id}" class="form-control mb-2">
+                            <input type="text" id="spend-description-${id}" class="form-control mb-2" placeholder="Description">
+                            <input type="number" id="spend-amount-${id}" class="form-control mb-2" placeholder="Amount">
+                            <button id="spend-btn-${id}" class="btn btn-danger">Save</button>
+                        </div>
+                    </div>
                 </div>
             `;
             content.appendChild(earnSpendSection);
@@ -209,6 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             content.appendChild(transactionHeader);
 
             const transactionList = document.createElement('table');
+            transactionList.className = 'table table-striped';
             transactionList.innerHTML = `
                 <thead>
                     <tr>
@@ -227,7 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td>${tx.date}</td>
                     <td>${tx.description}</td>
                     <td>${tx.amount.toFixed(2)}</td>
-                    <td><button class="delete-transaction-btn" data-account-id="${id}" data-index="${index}">Delete</button></td>
+                    <td><button class="btn btn-sm btn-warning delete-transaction-btn" data-account-id="${id}" data-index="${index}">Delete</button></td>
                 `;
                 transactionListBody.appendChild(row);
             });
@@ -240,7 +270,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const canvas = document.createElement('canvas');
             content.appendChild(canvas);
 
-            accountBox.appendChild(content);
+            contentContainer.appendChild(content);
+            accountBox.appendChild(contentContainer);
             accountsContainer.appendChild(accountBox);
 
             document.getElementById(`earn-date-${id}`).valueAsDate = new Date();
@@ -345,8 +376,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    
-
     addAccountBtn.addEventListener('click', () => {
         const name = accountNameInput.value.trim();
         const imageFile = accountImageInput.files[0];
@@ -383,18 +412,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    accountsContainer.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        const accountBox = e.target.closest('.account-box');
-        if (accountBox) {
-            currentAccountId = accountBox.dataset.accountId;
-            accountContextMenu.style.display = 'block';
-            accountContextMenu.style.left = `${e.pageX}px`;
-            accountContextMenu.style.top = `${e.pageY}px`;
-            settingsMenu.classList.remove('show');
-        }
-    });
-
     removeAccountLink.addEventListener('click', (e) => {
         e.preventDefault();
         if (currentAccountId && confirm('Are you sure you want to remove this account?')) {
@@ -402,13 +419,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             saveState();
             renderAll();
         }
-        accountContextMenu.style.display = 'none';
+        accountContextMenu.hide();
     });
 
     addEditImageLink.addEventListener('click', (e) => {
         e.preventDefault();
         editAccountImageInput.click();
-        accountContextMenu.style.display = 'none';
+        accountContextMenu.hide();
     });
 
     removeImageLink.addEventListener('click', (e) => {
@@ -418,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             saveState();
             renderAll();
         }
-        accountContextMenu.style.display = 'none';
+        accountContextMenu.hide();
     });
 
     editAccountImageInput.addEventListener('change', () => {
@@ -434,28 +451,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    settingsBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        settingsMenu.classList.toggle('show');
-        accountContextMenu.style.display = 'none';
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!settingsMenu.contains(e.target) && !settingsBtn.contains(e.target)) {
-            settingsMenu.classList.remove('show');
-        }
-        if (!accountContextMenu.contains(e.target)) {
-            accountContextMenu.style.display = 'none';
-        }
-    });
-
     function renderAll() {
-        const activeAccountIds = [...document.querySelectorAll('.account-box.active')].map(box => box.dataset.accountId);
+        const activeAccountIds = [...document.querySelectorAll('.accordion-collapse.show')].map(el => el.id.replace('collapse-', ''));
         renderAccounts();
         activeAccountIds.forEach(id => {
-            const accountBox = document.querySelector(`.account-box[data-account-id="${id}"]`);
-            if (accountBox) {
-                accountBox.classList.add('active');
+            const accountCollapse = document.getElementById(`collapse-${id}`);
+            if (accountCollapse) {
+                new bootstrap.Collapse(accountCollapse, {
+                    toggle: true
+                });
             }
         });
     }
