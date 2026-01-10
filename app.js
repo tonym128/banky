@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const importBtn = document.getElementById('import-btn');
     const importFileInput = document.getElementById('import-file');
     const accountsContainer = document.getElementById('accounts-container');
+    const autoSyncToggle = document.getElementById('auto-sync-toggle');
     
     const settingsBtn = document.getElementById('settings-btn');
     const settingsMenu = document.getElementById('settings-menu');
@@ -15,10 +16,43 @@ document.addEventListener('DOMContentLoaded', () => {
     let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
     let charts = {};
     let currentAccountId = null;
+    let autoSyncEnabled = JSON.parse(localStorage.getItem('autoSyncEnabled')) || false;
+
+    autoSyncToggle.checked = autoSyncEnabled;
+
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
+
+    const autoExport = debounce(() => {
+        if (!autoSyncEnabled) return;
+        const data = JSON.stringify(accounts, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'kids-bank-data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }, 1500);
 
     function saveState() {
         localStorage.setItem('accounts', JSON.stringify(accounts));
+        autoExport();
     }
+
+    autoSyncToggle.addEventListener('change', () => {
+        autoSyncEnabled = autoSyncToggle.checked;
+        localStorage.setItem('autoSyncEnabled', JSON.stringify(autoSyncEnabled));
+        if (autoSyncEnabled) {
+            saveState();
+        }
+    });
 
     function renderAccounts() {
         accountsContainer.innerHTML = '';

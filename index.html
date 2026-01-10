@@ -26,6 +26,10 @@
                         <button id="export-btn">Export Data</button>
                         <input type="file" id="import-file" accept=".json" style="display: none;">
                         <button id="import-btn">Import Data</button>
+                        <div class="auto-sync-container">
+                            <label for="auto-sync-toggle">Auto-sync to disk</label>
+                            <input type="checkbox" id="auto-sync-toggle">
+                        </div>
                     </div>
                     <div class="account-section">
                         <h3>Add Account</h3>
@@ -43,7 +47,10 @@
         <div id="accounts-container"></div>
 
         <div id="account-context-menu" class="context-menu">
+            <a href="#" id="add-edit-image-link">Add/Edit Image</a>
+            <a href="#" id="remove-image-link">Remove Image</a>
             <a href="#" id="remove-account-link">Remove Account</a>
+            <input type="file" id="edit-account-image" accept="image/*" style="display: none;">
         </div>
     </div>
 

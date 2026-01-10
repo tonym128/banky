@@ -260,3 +260,13 @@ button:hover {
 .close-btn:hover {
     color: black;
 }
+
+.auto-sync-container {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+#auto-sync-toggle {
+    margin-left: 10px;
+}
