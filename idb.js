@@ -19,7 +19,7 @@ function openDB() {
     });
 }
 
-async function set(key, value) {
+export async function set(key, value) {
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction('file-handles', 'readwrite');
@@ -36,7 +36,7 @@ async function set(key, value) {
     });
 }
 
-async function get(key) {
+export async function get(key) {
     const db = await openDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction('file-handles', 'readonly');
