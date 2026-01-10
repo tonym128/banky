@@ -87,16 +87,6 @@ export function initUI() {
         }
     });
 
-    accountsContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('delete-transaction-btn')) {
-            const accountId = e.target.dataset.accountId;
-            const index = parseInt(e.target.dataset.index, 10);
-            accounts[accountId].transactions.splice(index, 1);
-            saveState();
-            renderAll();
-        }
-    });
-
     removeAccountLink.addEventListener('click', (e) => {
         e.preventDefault();
         if (currentAccountId && confirm('Are you sure you want to remove this account?')) {
@@ -133,6 +123,19 @@ export function initUI() {
                 renderAll();
             };
             reader.readAsDataURL(file);
+        }
+    });
+
+    accountsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-transaction-btn')) {
+            const accountId = e.target.dataset.accountId;
+            const transactionId = parseInt(e.target.dataset.transactionId, 10);
+            const transactionIndex = accounts[accountId].transactions.findIndex(tx => tx.id === transactionId);
+            if (transactionIndex > -1) {
+                accounts[accountId].transactions.splice(transactionIndex, 1);
+                saveState();
+                renderAll();
+            }
         }
     });
 
@@ -227,9 +230,36 @@ function renderAccounts() {
         `;
         content.appendChild(earnSpendSection);
 
+        const graphHeader = document.createElement('h3');
+        graphHeader.textContent = 'Balance History';
+        content.appendChild(graphHeader);
+
+        const canvas = document.createElement('canvas');
+        content.appendChild(canvas);
+
         const transactionHeader = document.createElement('h3');
         transactionHeader.textContent = 'Transactions';
         content.appendChild(transactionHeader);
+
+        const dateFilterSection = document.createElement('div');
+        dateFilterSection.className = 'row mb-3';
+        dateFilterSection.innerHTML = `
+            <div class="col-md-4">
+                <label for="month-select-${id}" class="form-label">Month</label>
+                <select id="month-select-${id}" class="form-select">
+                    <option value="-1">All</option>
+                    ${[...Array(12).keys()].map(i => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'long' })}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="year-select-${id}" class="form-label">Year</label>
+                <select id="year-select-${id}" class="form-select"></select>
+            </div>
+        `;
+        content.appendChild(dateFilterSection);
+
+        const startingBalanceEl = document.createElement('p');
+        content.appendChild(startingBalanceEl);
 
         const transactionList = document.createElement('table');
         transactionList.className = 'table table-striped';
@@ -244,29 +274,61 @@ function renderAccounts() {
             </thead>
             <tbody></tbody>
         `;
-        const transactionListBody = transactionList.querySelector('tbody');
-        account.transactions.forEach((tx, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${tx.date}</td>
-                <td>${tx.description}</td>
-                <td>${tx.amount.toFixed(2)}</td>
-                <td><button class="btn btn-sm btn-warning delete-transaction-btn" data-account-id="${id}" data-index="${index}">Delete</button></td>
-            `;
-            transactionListBody.appendChild(row);
-        });
         content.appendChild(transactionList);
-
-        const graphHeader = document.createElement('h3');
-        graphHeader.textContent = 'Balance History (Last 30 Days)';
-        content.appendChild(graphHeader);
-
-        const canvas = document.createElement('canvas');
-        content.appendChild(canvas);
-
+        
         contentContainer.appendChild(content);
         accountBox.appendChild(contentContainer);
         accountsContainer.appendChild(accountBox);
+
+        const monthSelect = document.getElementById(`month-select-${id}`);
+        const yearSelect = document.getElementById(`year-select-${id}`);
+
+        const years = [...new Set(account.transactions.map(tx => new Date(tx.date).getFullYear()))];
+        yearSelect.innerHTML = '<option value="-1">All</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+        const updateTransactions = () => {
+            const selectedMonth = parseInt(monthSelect.value, 10);
+            const selectedYear = parseInt(yearSelect.value, 10);
+
+            let filteredTransactions = account.transactions;
+
+            if (selectedYear !== -1) {
+                filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getFullYear() === selectedYear);
+            }
+            if (selectedMonth !== -1) {
+                filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getMonth() === selectedMonth);
+            }
+
+            const startingBalance = account.transactions
+                .filter(tx => {
+                    const txDate = new Date(tx.date);
+                    if (selectedYear === -1) return false;
+                    if (selectedMonth === -1) {
+                        return txDate.getFullYear() < selectedYear;
+                    }
+                    return txDate < new Date(selectedYear, selectedMonth, 1);
+                })
+                .reduce((sum, tx) => sum + tx.amount, 0);
+
+            startingBalanceEl.textContent = `Starting Balance: ${startingBalance.toFixed(2)}`;
+
+            const transactionListBody = transactionList.querySelector('tbody');
+            transactionListBody.innerHTML = '';
+            filteredTransactions.forEach((tx) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${tx.date}</td>
+                    <td>${tx.description}</td>
+                    <td>${tx.amount.toFixed(2)}</td>
+                    <td><button class="btn btn-sm btn-warning delete-transaction-btn" data-account-id="${id}" data-transaction-id="${tx.id}">Delete</button></td>
+                `;
+                transactionListBody.appendChild(row);
+            });
+            renderGraph(canvas, account, id, filteredTransactions);
+        };
+
+        monthSelect.addEventListener('change', updateTransactions);
+        yearSelect.addEventListener('change', updateTransactions);
 
         document.getElementById(`earn-date-${id}`).valueAsDate = new Date();
         document.getElementById(`spend-date-${id}`).valueAsDate = new Date();
@@ -279,7 +341,7 @@ function renderAccounts() {
                 date = new Date().toISOString().split('T')[0];
             }
             if (!isNaN(amount)) {
-                accounts[id].transactions.push({ date, description, amount });
+                accounts[id].transactions.push({ id: Date.now(), date, description, amount });
                 document.getElementById(`earn-description-${id}`).value = '';
                 document.getElementById(`earn-amount-${id}`).value = '';
                 saveState();
@@ -295,37 +357,38 @@ function renderAccounts() {
                 date = new Date().toISOString().split('T')[0];
             }
             if (!isNaN(amount)) {
-                accounts[id].transactions.push({ date, description, amount: -amount });
+                accounts[id].transactions.push({ id: Date.now(), date, description, amount: -amount });
                 document.getElementById(`spend-description-${id}`).value = '';
                 document.getElementById(`spend-amount-${id}`).value = '';
                 saveState();
                 renderAll();
             }
         });
-
-        renderGraph(canvas, account, id);
+        updateTransactions();
     }
 }
 
-function renderGraph(canvas, account, id) {
+function renderGraph(canvas, account, id, transactions) {
     const today = new Date();
     const last30Days = new Date(today);
     last30Days.setDate(today.getDate() - 30);
 
-    const transactionsInLast30Days = account.transactions.filter(tx => new Date(tx.date) >= last30Days);
-    transactionsInLast30Days.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const transactionsToGraph = transactions || account.transactions.filter(tx => new Date(tx.date) >= last30Days);
+    transactionsToGraph.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     const labels = [];
     const data = [];
     let runningBalance = 0;
 
     const dateMap = new Map();
-    transactionsInLast30Days.forEach(tx => {
+    transactionsToGraph.forEach(tx => {
         runningBalance += tx.amount;
         dateMap.set(tx.date, runningBalance);
     });
 
-    for (let i = 0; i < 30; i++) {
+    const displayDays = transactions ? transactions.length : 30;
+
+    for (let i = 0; i < displayDays; i++) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
         const dateString = date.toISOString().split('T')[0];
