@@ -451,6 +451,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    let deferredPrompt;
+    const installPwaBtn = document.getElementById('install-pwa-btn');
+    const installPwaSection = document.getElementById('pwa-install-section');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installPwaSection.style.display = 'block';
+    });
+
+    installPwaBtn.addEventListener('click', async () => {
+        installPwaSection.style.display = 'none';
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+        deferredPrompt = null;
+    });
+
+    window.addEventListener('appinstalled', () => {
+        console.log('PWA was installed');
+    });
+
     function renderAll() {
         const activeAccountIds = [...document.querySelectorAll('.accordion-collapse.show')].map(el => el.id.replace('collapse-', ''));
         renderAccounts();

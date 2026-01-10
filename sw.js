@@ -1,35 +1,47 @@
-const CACHE_NAME = 'kids-bank-cache-v1';
+const CACHE_NAME = 'kids-bank-cache-v2';
 const urlsToCache = [
-  '/banky/',
-  '/banky/index.html',
-  '/banky/styles.css',
-  '/banky/app.js',
-  '/banky/android-chrome-192x192.png',
-  '/banky/android-chrome-512x512.png',
-  '/banky/favicon.ico',
-  '/banky/favicon-16x16.png',
-  '/banky/favicon-32x32.png',
-  '/banky/apple-touch-icon.png'
+    '/',
+    'index.html',
+    'styles.css',
+    'app.js',
+    'idb.js',
+    'manifest.json',
+    'images/banky.png',
+    'images/logo.svg',
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => {
+                console.log('Opened cache');
+                return cache.addAll(urlsToCache);
+            })
+    );
+});
+
+self.addEventListener('activate', event => {
+    const cacheWhitelist = [CACHE_NAME];
+    event.waitUntil(
+        caches.keys().then(cacheNames => {
+            return Promise.all(
+                cacheNames.map(cacheName => {
+                    if (cacheWhitelist.indexOf(cacheName) === -1) {
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
+    event.respondWith(
+        fetch(event.request).catch(() => {
+            return caches.match(event.request);
+        })
+    );
 });
