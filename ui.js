@@ -1,5 +1,7 @@
 // ui.js
-import { accounts, saveState, setSyncFile, setAutoSyncEnabled, autoSyncEnabled, fsaSupported, setAccounts, fileHandle } from './state.js';
+import { accounts, saveState, setSyncFile, setAutoSyncEnabled, autoSyncEnabled, fsaSupported, setAccounts, fileHandle, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud } from './state.js';
+import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
+import { generateKey, exportKey } from './encryption.js';
 
 let charts = {};
 let currentAccountId = null;
@@ -13,6 +15,32 @@ export function initUI() {
     const autoSyncToggle = document.getElementById('auto-sync-toggle');
     const accountsContainer = document.getElementById('accounts-container');
     
+    // Cloud Sync UI Elements
+    const cloudSyncToggle = document.getElementById('cloud-sync-toggle');
+    const cloudSyncSettings = document.getElementById('cloud-sync-settings');
+    const modeSelectCredentials = document.getElementById('mode-select-credentials');
+    const modeSelectPar = document.getElementById('mode-select-par');
+    const modeCredentialsDiv = document.getElementById('mode-credentials');
+    const modeParDiv = document.getElementById('mode-par');
+
+    const awsEndpointInput = document.getElementById('aws-endpoint');
+    const awsBucketInput = document.getElementById('aws-bucket');
+    const awsRegionInput = document.getElementById('aws-region');
+    const awsAccessKeyInput = document.getElementById('aws-access-key');
+    const awsSecretKeyInput = document.getElementById('aws-secret-key');
+    const awsParUrlInput = document.getElementById('aws-par-url');
+
+    const saveCloudConfigBtn = document.getElementById('save-cloud-config-btn');
+    const generateSyncKeysBtn = document.getElementById('generate-sync-keys-btn');
+    const showQrBtn = document.getElementById('show-qr-btn');
+    const scanQrBtn = document.getElementById('scan-qr-btn');
+    const scanQrFileBtn = document.getElementById('scan-qr-file-btn');
+    const qrFileInput = document.getElementById('qr-file-input');
+    const qrCodeContainer = document.getElementById('qr-code-container');
+    const importConfigText = document.getElementById('import-config-text');
+    const importConfigBtn = document.getElementById('import-config-btn');
+    const qrScannerModal = new bootstrap.Modal(document.getElementById('qr-scanner-modal'));
+
     const accountContextMenu = new bootstrap.Modal(document.getElementById('account-context-menu'));
     const removeAccountLink = document.getElementById('remove-account-link');
     const addEditImageLink = document.getElementById('add-edit-image-link');
@@ -20,6 +48,42 @@ export function initUI() {
     const editAccountImageInput = document.getElementById('edit-account-image');
 
     autoSyncToggle.checked = autoSyncEnabled;
+    cloudSyncToggle.checked = cloudSyncEnabled;
+
+    if (cloudSyncEnabled) {
+        cloudSyncSettings.style.display = 'block';
+    }
+
+    // Toggle logic for modes
+    function updateModeVisibility() {
+        if (modeSelectPar.checked) {
+            modeCredentialsDiv.style.display = 'none';
+            modeParDiv.style.display = 'block';
+        } else {
+            modeCredentialsDiv.style.display = 'block';
+            modeParDiv.style.display = 'none';
+        }
+    }
+
+    modeSelectCredentials.addEventListener('change', updateModeVisibility);
+    modeSelectPar.addEventListener('change', updateModeVisibility);
+
+    // Init Cloud Config Inputs
+    const existingCloudConfig = getCloudConfig();
+    if (existingCloudConfig) {
+        if (existingCloudConfig.parUrl) {
+            modeSelectPar.checked = true;
+            awsParUrlInput.value = existingCloudConfig.parUrl;
+        } else {
+            modeSelectCredentials.checked = true;
+            awsEndpointInput.value = existingCloudConfig.endpoint || '';
+            awsBucketInput.value = existingCloudConfig.bucket || '';
+            awsRegionInput.value = existingCloudConfig.region || '';
+            awsAccessKeyInput.value = existingCloudConfig.accessKeyId || '';
+            awsSecretKeyInput.value = existingCloudConfig.secretAccessKey || '';
+        }
+        updateModeVisibility();
+    }
 
     if (!fsaSupported) {
         setSyncFileBtn.textContent = 'Export';
@@ -41,6 +105,249 @@ export function initUI() {
             }
             saveState();
         }
+    });
+
+    // Cloud Sync Event Listeners
+    cloudSyncToggle.addEventListener('change', () => {
+        const enabled = cloudSyncToggle.checked;
+        setCloudSyncEnabled(enabled);
+        cloudSyncSettings.style.display = enabled ? 'block' : 'none';
+        if (enabled) {
+            saveState(); // Triggers sync if configured
+        }
+    });
+
+    saveCloudConfigBtn.addEventListener('click', () => {
+        let config = {};
+
+        if (modeSelectPar.checked) {
+            // PAR Mode
+            const parUrl = awsParUrlInput.value.trim();
+            if (!parUrl) {
+                 alert('Please enter a valid PAR URL.');
+                 return;
+            }
+            config = { parUrl };
+        } else {
+            // Credentials Mode
+             config = {
+                endpoint: awsEndpointInput.value.trim(),
+                bucket: awsBucketInput.value.trim(),
+                region: awsRegionInput.value.trim(),
+                accessKeyId: awsAccessKeyInput.value.trim(),
+                secretAccessKey: awsSecretKeyInput.value.trim()
+            };
+            if (!config.bucket || !config.region || !config.accessKeyId || !config.secretAccessKey) {
+                alert('Please fill in all AWS configuration fields (Endpoint is optional for AWS).');
+                return;
+            }
+        }
+        
+        setCloudConfig(config);
+        alert('Cloud configuration saved.');
+        saveState(); // Trigger sync attempt
+    });
+
+    generateSyncKeysBtn.addEventListener('click', async () => {
+        if (!confirm('This will generate a new sync ID and encryption key. Any existing data in the cloud with the old ID will be lost to this device (unless you have a backup). Continue?')) {
+            return;
+        }
+        const guid = crypto.randomUUID();
+        const key = await generateKey();
+        const jwk = await exportKey(key);
+        setSyncDetails(guid, jwk);
+        alert('New Sync ID and Encryption Key generated. You can now sync.');
+        saveState();
+    });
+
+    showQrBtn.addEventListener('click', () => {
+        const cloudConfig = getCloudConfig();
+        if (!cloudConfig || !syncGuid || !encryptionKeyJwk) {
+            alert('Please configure Cloud Sync (AWS details + Generate Keys) first.');
+            return;
+        }
+
+        // Construct the payload
+        const payload = {
+            aws: cloudConfig,
+            guid: syncGuid,
+            key: encryptionKeyJwk
+        };
+
+        qrCodeContainer.innerHTML = '';
+        new QRCode(qrCodeContainer, {
+            text: JSON.stringify(payload),
+            width: 400,
+            height: 400,
+            correctLevel: QRCode.CorrectLevel.L
+        });
+        
+        // Also show text backup?
+        // qrCodeContainer.insertAdjacentHTML('beforeend', '<p class="text-muted small mt-2">Scan with another device to sync.</p>');
+    });
+
+    async function processImportedConfig(payload) {
+        if (!payload.aws || !payload.guid || !payload.key) {
+            alert('Invalid configuration format. Missing aws config, guid, or encryption key.');
+            console.error('Import failed. Invalid payload structure:', payload);
+            return;
+        }
+
+        console.log("Importing Configuration:", {
+            mode: payload.aws.parUrl ? 'PAR' : 'Credentials',
+            guid: payload.guid,
+            hasKey: !!payload.key
+        });
+
+        if (payload.aws && payload.guid && payload.key) {
+            setCloudConfig(payload.aws);
+            setSyncDetails(payload.guid, payload.key);
+            
+            // Update UI inputs
+            if (payload.aws.parUrl) {
+                modeSelectPar.checked = true;
+                awsParUrlInput.value = payload.aws.parUrl;
+            } else {
+                modeSelectCredentials.checked = true;
+                awsEndpointInput.value = payload.aws.endpoint || '';
+                awsBucketInput.value = payload.aws.bucket;
+                awsRegionInput.value = payload.aws.region;
+                awsAccessKeyInput.value = payload.aws.accessKeyId;
+                awsSecretKeyInput.value = payload.aws.secretAccessKey;
+            }
+            updateModeVisibility();
+
+            // Load Data
+            initS3Client();
+            const data = await loadFromCloud();
+            if (data) {
+                setAccounts(data);
+                saveState();
+                renderAll();
+                alert('Configuration imported and data synced successfully!');
+            } else {
+                alert('Configuration imported. No data found on cloud yet or download failed.');
+            }
+        }
+    }
+
+    importConfigBtn.addEventListener('click', async () => {
+        const text = importConfigText.value.trim();
+        if (!text) return;
+        try {
+            const payload = JSON.parse(text);
+            await processImportedConfig(payload);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to parse configuration. Ensure it is valid JSON.');
+        }
+    });
+
+    scanQrFileBtn.addEventListener('click', () => {
+        qrFileInput.click();
+    });
+
+    qrFileInput.addEventListener('change', async () => {
+        const file = qrFileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                context.drawImage(img, 0, 0, img.width, img.height);
+                const imageData = context.getImageData(0, 0, img.width, img.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    console.log("File Scan Result:", code.data);
+                    try {
+                        const payload = JSON.parse(code.data);
+                        processImportedConfig(payload);
+                    } catch (e) {
+                        console.error("Scanned text is not valid JSON:", e);
+                        alert("Scanned QR code does not contain a valid configuration.");
+                    }
+                } else {
+                    alert("Failed to detect a QR code in the image.");
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        qrFileInput.value = ''; // Reset input
+    });
+
+    let videoStream = null;
+    let isScanning = false;
+
+    scanQrBtn.addEventListener('click', () => {
+        qrScannerModal.show();
+        const qrReaderDiv = document.getElementById('qr-reader');
+        qrReaderDiv.innerHTML = ''; // Clear previous content
+
+        const video = document.createElement('video');
+        video.style.width = '100%';
+        qrReaderDiv.appendChild(video);
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+            videoStream = stream;
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true); // required to tell iOS safari we don't want fullscreen
+            video.play();
+            isScanning = true;
+            requestAnimationFrame(tick);
+        }).catch(function(err) {
+            console.error(err);
+            qrReaderDiv.innerHTML = '<p class="text-danger">Failed to access camera. Please allow camera permissions.</p>';
+        });
+
+        function tick() {
+            if (!isScanning) return;
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    console.log("Found QR code", code.data);
+                    try {
+                        const payload = JSON.parse(code.data);
+                        stopScanning();
+                        qrScannerModal.hide();
+                        processImportedConfig(payload);
+                    } catch (e) {
+                         // Ignore invalid JSON, keep scanning or maybe show a toast?
+                         console.log("Scanned code is not valid config JSON", e);
+                    }
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+    });
+
+    function stopScanning() {
+        isScanning = false;
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+    }
+
+    document.getElementById('qr-scanner-modal').addEventListener('hidden.bs.modal', () => {
+        stopScanning();
     });
 
     importFileInput.addEventListener('change', () => {

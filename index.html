@@ -11,6 +11,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
     <div class="container mt-4">
@@ -43,6 +45,51 @@
                             </div>
                         </div>
                         <div class="mb-3">
+                            <h3>Cloud Sync (S3)</h3>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="cloud-sync-toggle">
+                                <label class="form-check-label" for="cloud-sync-toggle">Enable Cloud Sync</label>
+                            </div>
+                            <div id="cloud-sync-settings" style="display: none;" class="mt-2">
+                                <div class="mb-3">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="cloud-mode" id="mode-select-credentials" value="credentials" checked>
+                                        <label class="form-check-label" for="mode-select-credentials">Credentials (S3/OCI)</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="cloud-mode" id="mode-select-par" value="par">
+                                        <label class="form-check-label" for="mode-select-par">Pre-Authenticated Request (PAR)</label>
+                                    </div>
+                                </div>
+
+                                <div id="mode-credentials">
+                                    <label class="form-label small text-muted">S3 Endpoint (Optional for AWS, Required for OCI)</label>
+                                    <input type="text" id="aws-endpoint" class="form-control mb-2" placeholder="https://<namespace>.compat.objectstorage.<region>.oraclecloud.com">
+                                    <input type="text" id="aws-bucket" class="form-control mb-2" placeholder="Bucket Name">
+                                    <input type="text" id="aws-region" class="form-control mb-2" placeholder="Region (e.g. us-east-1)">
+                                    <input type="text" id="aws-access-key" class="form-control mb-2" placeholder="Access Key ID">
+                                    <input type="password" id="aws-secret-key" class="form-control mb-2" placeholder="Secret Access Key">
+                                </div>
+
+                                <div id="mode-par" style="display: none;">
+                                    <label class="form-label small text-muted">Pre-Authenticated Request URL (Folder level)</label>
+                                    <input type="text" id="aws-par-url" class="form-control mb-2" placeholder="https://objectstorage.../o/">
+                                </div>
+
+                                <button id="save-cloud-config-btn" class="btn btn-primary btn-sm">Save Config</button>
+                                <button id="generate-sync-keys-btn" class="btn btn-secondary btn-sm">Generate New Keys</button>
+                                <hr>
+                                <h5>Share / Import</h5>
+                                <button id="show-qr-btn" class="btn btn-info btn-sm">Show QR Code</button>
+                                <button id="scan-qr-btn" class="btn btn-dark btn-sm ms-2">Scan QR Code</button>
+                                <button id="scan-qr-file-btn" class="btn btn-secondary btn-sm ms-2">Scan from Image</button>
+                                <input type="file" id="qr-file-input" accept="image/*" style="display: none;">
+                                <div id="qr-code-container" class="mt-2"></div>
+                                <textarea id="import-config-text" class="form-control mt-2" placeholder="Paste Config JSON here to import" rows="3"></textarea>
+                                <button id="import-config-btn" class="btn btn-warning btn-sm mt-2">Import Config</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
                             <h3>Add Account</h3>
                             <input type="text" id="account-name" class="form-control mb-2" placeholder="New account name">
                             <label for="account-image" class="form-label">Avatar:</label>
@@ -71,6 +118,20 @@
                         <a href="#" id="remove-image-link" class="d-block mb-2">Remove Image</a>
                         <a href="#" id="remove-account-link" class="d-block text-danger">Remove Account</a>
                         <input type="file" id="edit-account-image" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- QR Scanner Modal -->
+        <div class="modal fade" id="qr-scanner-modal" tabindex="-1" aria-labelledby="qrScannerModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="qrScannerModalLabel">Scan Setup QR</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="qr-reader" style="width: 100%"></div>
                     </div>
                 </div>
             </div>

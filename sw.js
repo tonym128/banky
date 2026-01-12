@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kids-bank-cache-v3';
+const CACHE_NAME = 'kids-bank-cache-v7';
 const urlsToCache = [
     '/',
     'index.html',
@@ -8,6 +8,8 @@ const urlsToCache = [
     'pwa.js',
     'state.js',
     'idb.js',
+    's3.js',
+    'encryption.js',
     'manifest.json',
     'images/banky.png',
     'images/logo.svg',
@@ -15,7 +17,9 @@ const urlsToCache = [
     'android-chrome-512x512.png',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-    'https://cdn.jsdelivr.net/npm/chart.js'
+    'https://cdn.jsdelivr.net/npm/chart.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'
 ];
 
 self.addEventListener('install', event => {
