@@ -5,6 +5,10 @@ import { uploadToS3, downloadFromS3, getCloudConfig } from './s3.js';
 import { encryptData, decryptData, importKey, generateKey, exportKey } from './encryption.js';
 
 export let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
+export let deletedAccountIds = JSON.parse(localStorage.getItem('deletedAccountIds')) || [];
+// Track accounts explicitly restored via import to protect them from cloud tombstones
+export let restoredAccountIds = JSON.parse(localStorage.getItem('restoredAccountIds')) || [];
+
 export let fileHandle = null;
 export let autoSyncEnabled = JSON.parse(localStorage.getItem('autoSyncEnabled')) || false;
 export let fsaSupported = 'showOpenFilePicker' in window;
@@ -16,8 +20,23 @@ export let encryptionKeyJwk = JSON.parse(localStorage.getItem('encryptionKeyJwk'
 let cachedCryptoKey = null;
 let isSyncing = false;
 
-export function setAccounts(newAccounts) {
+export function setAccounts(newAccounts, clearDeletedIds = false) {
     accounts = newAccounts;
+    if (clearDeletedIds) {
+        // Revive accounts by removing them from the tombstone list
+        // And add them to restored list to protect from cloud tombstones during next sync
+        for (const id in newAccounts) {
+            const index = deletedAccountIds.indexOf(id);
+            if (index > -1) {
+                deletedAccountIds.splice(index, 1);
+            }
+            if (!restoredAccountIds.includes(id)) {
+                restoredAccountIds.push(id);
+            }
+        }
+        localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
+        localStorage.setItem('restoredAccountIds', JSON.stringify(restoredAccountIds));
+    }
 }
 
 export function setFileHandle(newFileHandle) {
@@ -59,16 +78,26 @@ function normalizeTransactions(txs) {
         if (!tx.id) {
             return { ...tx, id: crypto.randomUUID() };
         }
-        return tx;
+        // Ensure ID is a string to prevent type mismatches during merge
+        return { ...tx, id: String(tx.id) };
     });
 }
 
 /**
  * Merges cloud data into local data.
  * Transactions are merged by ID. Metadata (names, images) prefers local.
+ * Respects deleted accounts (tombstones), but allows Restoration via restoredAccountIds.
  */
-function mergeAccounts(local, cloud) {
+function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
     const merged = { ...cloud };
+    
+    // Merge deleted IDs
+    let mergedDeletedIds = [...new Set([...(localDeleted || []), ...(cloudDeleted || [])])];
+
+    // Filter out any IDs that are pending restoration
+    if (restoredAccountIds.length > 0) {
+        mergedDeletedIds = mergedDeletedIds.filter(id => !restoredAccountIds.includes(id));
+    }
 
     for (const id in local) {
         if (!merged[id]) {
@@ -81,9 +110,9 @@ function mergeAccounts(local, cloud) {
             
             const txMap = new Map();
             // Cloud transactions first
-            cloudTx.forEach(tx => txMap.set(tx.id, tx));
+            cloudTx.forEach(tx => txMap.set(String(tx.id), tx));
             // Local transactions overwrite/add
-            localTx.forEach(tx => txMap.set(tx.id, tx));
+            localTx.forEach(tx => txMap.set(String(tx.id), tx));
             
             merged[id].transactions = Array.from(txMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
             
@@ -95,10 +124,37 @@ function mergeAccounts(local, cloud) {
 
     // Also normalize any cloud accounts that aren't in local
     for (const id in merged) {
-        merged[id].transactions = normalizeTransactions(merged[id].transactions);
+        if (merged[id]) {
+            merged[id].transactions = normalizeTransactions(merged[id].transactions);
+        }
     }
 
-    return merged;
+    // Final cleanup: Remove any accounts that are in the deleted list
+    mergedDeletedIds.forEach(deletedId => {
+        if (merged[deletedId]) {
+            delete merged[deletedId];
+        }
+    });
+
+    return { accounts: merged, deletedIds: mergedDeletedIds };
+}
+
+export function removeAccount(accountId) {
+    if (accounts[accountId]) {
+        delete accounts[accountId];
+        if (!deletedAccountIds.includes(accountId)) {
+            deletedAccountIds.push(accountId);
+        }
+        
+        // Ensure we don't protect this account if it was previously restored
+        const restoreIndex = restoredAccountIds.indexOf(accountId);
+        if (restoreIndex > -1) {
+            restoredAccountIds.splice(restoreIndex, 1);
+            localStorage.setItem('restoredAccountIds', JSON.stringify(restoredAccountIds));
+        }
+
+        saveState();
+    }
 }
 
 export async function syncWithCloud() {
@@ -107,18 +163,43 @@ export async function syncWithCloud() {
     isSyncing = true;
     try {
         console.log("Starting full cloud sync (Merge & Upload)...");
-        const cloudData = await loadFromCloud();
+        const cloudDataPayload = await loadFromCloud();
         
-        if (cloudData) {
-            const merged = mergeAccounts(accounts, cloudData);
-            accounts = merged;
+        let mergedResult;
+        
+        if (cloudDataPayload) {
+            // Handle legacy format (just accounts object) vs new format (wrapper)
+            let cloudAccounts = cloudDataPayload;
+            let cloudDeletedIds = [];
+            
+            if (cloudDataPayload.accounts && Array.isArray(cloudDataPayload.deletedIds)) {
+                cloudAccounts = cloudDataPayload.accounts;
+                cloudDeletedIds = cloudDataPayload.deletedIds;
+            }
+
+            mergedResult = mergeAccounts(accounts, cloudAccounts, deletedAccountIds, cloudDeletedIds);
+            accounts = mergedResult.accounts;
+            deletedAccountIds = mergedResult.deletedIds;
+            
             localStorage.setItem('accounts', JSON.stringify(accounts));
+            localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
             renderAll();
+        } else {
+             // If no cloud data, just prepare local for upload
+             mergedResult = { accounts, deletedIds: deletedAccountIds };
         }
 
         const key = await getCryptoKey();
-        const encrypted = await encryptData(accounts, key);
+        // Upload the new wrapper structure
+        const encrypted = await encryptData(mergedResult, key);
         await uploadToS3(encrypted, syncGuid);
+        
+        // If upload successful, we can clear the restoration protection
+        if (restoredAccountIds.length > 0) {
+            restoredAccountIds = [];
+            localStorage.removeItem('restoredAccountIds');
+        }
+
         console.log("Cloud sync completed successfully.");
     } catch (error) {
         console.error("Cloud sync failed:", error);
@@ -148,7 +229,17 @@ export async function loadData() {
         const file = await fileHandle.getFile();
         const contents = await file.text();
         if (contents) {
-            accounts = JSON.parse(contents);
+            const parsed = JSON.parse(contents);
+             // Handle legacy format vs new format
+            if (parsed.accounts && Array.isArray(parsed.deletedIds)) {
+                accounts = parsed.accounts;
+                deletedAccountIds = parsed.deletedIds;
+            } else {
+                accounts = parsed;
+                // Keep existing deletedIds if loading legacy file
+            }
+            localStorage.setItem('accounts', JSON.stringify(accounts));
+            localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
             renderAll();
         }
     } catch (error) {
@@ -177,7 +268,8 @@ export async function loadFromCloud() {
 
 export async function setSyncFile() {
     if (!fsaSupported) {
-        const data = JSON.stringify(accounts, null, 2);
+        const exportData = { accounts, deletedIds: deletedAccountIds };
+        const data = JSON.stringify(exportData, null, 2);
         const blob = new Blob([data], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -212,13 +304,15 @@ export function debounce(func, delay) {
 }
 
 export const autoExport = debounce(async () => {
+    const exportData = { accounts, deletedIds: deletedAccountIds };
+
     // Local File Sync
     if (autoSyncEnabled) {
         if (fsaSupported && fileHandle) {
             if (await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted') {
                 try {
                     const writable = await fileHandle.createWritable();
-                    await writable.write(JSON.stringify(accounts, null, 2));
+                    await writable.write(JSON.stringify(exportData, null, 2));
                     await writable.close();
                 } catch (error) {
                     console.error('Failed to auto-sync to file:', error);
@@ -236,6 +330,7 @@ export const autoExport = debounce(async () => {
 
 export function saveState() {
     localStorage.setItem('accounts', JSON.stringify(accounts));
+    localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
     autoExport();
 }
 

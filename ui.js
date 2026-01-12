@@ -1,5 +1,5 @@
 // ui.js
-import { accounts, saveState, setSyncFile, setAutoSyncEnabled, autoSyncEnabled, fsaSupported, setAccounts, fileHandle, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud } from './state.js';
+import { accounts, saveState, setSyncFile, setAutoSyncEnabled, autoSyncEnabled, fsaSupported, setAccounts, fileHandle, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 
@@ -356,11 +356,19 @@ export function initUI() {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const importedAccounts = JSON.parse(e.target.result);
-                    setAccounts(importedAccounts);
+                    let importedData = JSON.parse(e.target.result);
+                    // Handle wrapped format vs legacy format
+                    if (importedData.accounts) {
+                        importedData = importedData.accounts;
+                    }
+                    
+                    // Revive accounts on explicit import
+                    setAccounts(importedData, true);
                     saveState();
                     renderAll();
+                    alert('Data imported successfully. Any previously deleted accounts in this file have been restored.');
                 } catch (error) {
+                    console.error(error);
                     alert('Invalid JSON file.');
                 }
             };
@@ -397,8 +405,7 @@ export function initUI() {
     removeAccountLink.addEventListener('click', (e) => {
         e.preventDefault();
         if (currentAccountId && confirm('Are you sure you want to remove this account?')) {
-            delete accounts[currentAccountId];
-            saveState();
+            removeAccount(currentAccountId);
             renderAll();
         }
         accountContextMenu.hide();
