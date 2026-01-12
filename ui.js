@@ -648,7 +648,7 @@ function renderAccounts() {
                 date = new Date().toISOString().split('T')[0];
             }
             if (!isNaN(amount)) {
-                accounts[id].transactions.push({ id: Date.now(), date, description, amount });
+                accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount });
                 document.getElementById(`earn-description-${id}`).value = '';
                 document.getElementById(`earn-amount-${id}`).value = '';
                 saveState();
@@ -664,7 +664,7 @@ function renderAccounts() {
                 date = new Date().toISOString().split('T')[0];
             }
             if (!isNaN(amount)) {
-                accounts[id].transactions.push({ id: Date.now(), date, description, amount: -amount });
+                accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount: -amount });
                 document.getElementById(`spend-description-${id}`).value = '';
                 document.getElementById(`spend-amount-${id}`).value = '';
                 saveState();

@@ -14,6 +14,7 @@ export let cloudSyncEnabled = JSON.parse(localStorage.getItem('cloudSyncEnabled'
 export let syncGuid = localStorage.getItem('syncGuid') || null;
 export let encryptionKeyJwk = JSON.parse(localStorage.getItem('encryptionKeyJwk')) || null;
 let cachedCryptoKey = null;
+let isSyncing = false;
 
 export function setAccounts(newAccounts) {
     accounts = newAccounts;
@@ -49,19 +50,67 @@ async function getCryptoKey() {
     return null;
 }
 
-export async function loadInitialFile() {
-    // Try Cloud Load first if enabled
-    if (cloudSyncEnabled && getCloudConfig()) {
-        const cloudData = await loadFromCloud();
-        if (cloudData) {
-            accounts = cloudData;
-            renderAll();
-            // Also try to hook up local file handle just in case
-            if (fsaSupported) {
-               fileHandle = await get('fileHandle');
-            }
-            return;
+/**
+ * Merges cloud data into local data.
+ * Transactions are merged by ID. Metadata (names, images) prefers local.
+ */
+function mergeAccounts(local, cloud) {
+    const merged = { ...cloud };
+
+    for (const id in local) {
+        if (!merged[id]) {
+            merged[id] = local[id];
+        } else {
+            // Merge transactions
+            const localTx = local[id].transactions || [];
+            const cloudTx = merged[id].transactions || [];
+            
+            const txMap = new Map();
+            // Cloud transactions first
+            cloudTx.forEach(tx => txMap.set(tx.id, tx));
+            // Local transactions overwrite/add
+            localTx.forEach(tx => txMap.set(tx.id, tx));
+            
+            merged[id].transactions = Array.from(txMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            // Prefer local for metadata if it exists
+            merged[id].name = local[id].name || merged[id].name;
+            if (local[id].image) merged[id].image = local[id].image;
         }
+    }
+    return merged;
+}
+
+export async function syncWithCloud() {
+    if (!cloudSyncEnabled || !syncGuid || !encryptionKeyJwk || isSyncing) return;
+    
+    isSyncing = true;
+    try {
+        console.log("Starting full cloud sync (Merge & Upload)...");
+        const cloudData = await loadFromCloud();
+        
+        if (cloudData) {
+            const merged = mergeAccounts(accounts, cloudData);
+            accounts = merged;
+            localStorage.setItem('accounts', JSON.stringify(accounts));
+            renderAll();
+        }
+
+        const key = await getCryptoKey();
+        const encrypted = await encryptData(accounts, key);
+        await uploadToS3(encrypted, syncGuid);
+        console.log("Cloud sync completed successfully.");
+    } catch (error) {
+        console.error("Cloud sync failed:", error);
+    } finally {
+        isSyncing = false;
+    }
+}
+
+export async function loadInitialFile() {
+    // Try Cloud Sync first if enabled
+    if (cloudSyncEnabled && getCloudConfig()) {
+        await syncWithCloud();
     }
 
     if (!fsaSupported) return;
@@ -94,12 +143,10 @@ export async function loadFromCloud() {
         return null;
     }
     try {
-        console.log("Attempting to download from cloud...");
         const encrypted = await downloadFromS3(syncGuid);
         if (encrypted) {
             const key = await getCryptoKey();
             const data = await decryptData(encrypted, key);
-            console.log("Successfully downloaded and decrypted data from cloud.");
             return data;
         }
     } catch (error) {
@@ -148,38 +195,31 @@ export const autoExport = debounce(async () => {
     // Local File Sync
     if (autoSyncEnabled) {
         if (fsaSupported && fileHandle) {
-            if (await fileHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
-                if (await fileHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
-                    // console.warn('Permission to write to the file was denied.');
-                }
-            }
-            try {
-                // Check if writable again (permission might have just been granted)
-                 if (await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted') {
+            if (await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted') {
+                try {
                     const writable = await fileHandle.createWritable();
                     await writable.write(JSON.stringify(accounts, null, 2));
                     await writable.close();
-                 }
-            } catch (error) {
-                console.error('Failed to auto-sync to file:', error);
+                } catch (error) {
+                    console.error('Failed to auto-sync to file:', error);
+                }
             }
         }
     }
 
     // Cloud Sync
     if (cloudSyncEnabled && syncGuid && encryptionKeyJwk) {
-        try {
-            const key = await getCryptoKey();
-            const encrypted = await encryptData(accounts, key);
-            await uploadToS3(encrypted, syncGuid);
-        } catch (error) {
-            console.error('Failed to auto-sync to cloud:', error);
-        }
+        await syncWithCloud();
     }
 
-}, 2000); // Increased debounce to 2s to account for encryption overhead
+}, 2000);
 
 export function saveState() {
     localStorage.setItem('accounts', JSON.stringify(accounts));
     autoExport();
 }
+
+window.addEventListener('online', () => {
+    console.log('Connection restored. Triggering sync...');
+    syncWithCloud();
+});
