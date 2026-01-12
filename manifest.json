@@ -1,6 +1,6 @@
 {
   "name": "Kids Bank",
-  "short_name": "KidsBank",
+  "short_name": "Kids Bank",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
