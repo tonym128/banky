@@ -436,8 +436,11 @@ export function initUI() {
     accountsContainer.addEventListener('click', (e) => {
         if (e.target.classList.contains('delete-transaction-btn')) {
             const accountId = e.target.dataset.accountId;
-            const transactionId = parseInt(e.target.dataset.transactionId, 10);
-            const transactionIndex = accounts[accountId].transactions.findIndex(tx => tx.id === transactionId);
+            const transactionId = e.target.dataset.transactionId; // Keep as string
+            
+            // Compare as strings to handle both UUIDs and legacy numeric IDs
+            const transactionIndex = accounts[accountId].transactions.findIndex(tx => String(tx.id) === transactionId);
+            
             if (transactionIndex > -1) {
                 accounts[accountId].transactions.splice(transactionIndex, 1);
                 saveState();
