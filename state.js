@@ -51,6 +51,19 @@ async function getCryptoKey() {
 }
 
 /**
+ * Ensures all transactions have a unique ID. 
+ * Legacy transactions using Date.now() or missing IDs are handled.
+ */
+function normalizeTransactions(txs) {
+    return (txs || []).map(tx => {
+        if (!tx.id) {
+            return { ...tx, id: crypto.randomUUID() };
+        }
+        return tx;
+    });
+}
+
+/**
  * Merges cloud data into local data.
  * Transactions are merged by ID. Metadata (names, images) prefers local.
  */
@@ -60,10 +73,11 @@ function mergeAccounts(local, cloud) {
     for (const id in local) {
         if (!merged[id]) {
             merged[id] = local[id];
+            merged[id].transactions = normalizeTransactions(merged[id].transactions);
         } else {
             // Merge transactions
-            const localTx = local[id].transactions || [];
-            const cloudTx = merged[id].transactions || [];
+            const localTx = normalizeTransactions(local[id].transactions);
+            const cloudTx = normalizeTransactions(merged[id].transactions);
             
             const txMap = new Map();
             // Cloud transactions first
@@ -78,6 +92,12 @@ function mergeAccounts(local, cloud) {
             if (local[id].image) merged[id].image = local[id].image;
         }
     }
+
+    // Also normalize any cloud accounts that aren't in local
+    for (const id in merged) {
+        merged[id].transactions = normalizeTransactions(merged[id].transactions);
+    }
+
     return merged;
 }
 
