@@ -182,8 +182,48 @@ export function initUI() {
             correctLevel: QRCode.CorrectLevel.L
         });
         
-        // Also show text backup?
-        // qrCodeContainer.insertAdjacentHTML('beforeend', '<p class="text-muted small mt-2">Scan with another device to sync.</p>');
+        // Make responsive
+        const qrImg = qrCodeContainer.querySelector('img');
+        if (qrImg) {
+            qrImg.style.maxWidth = '100%';
+            qrImg.style.height = 'auto';
+            
+            // Add Download Button
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'Download QR Image';
+            downloadBtn.className = 'btn btn-outline-secondary btn-sm mt-2';
+            downloadBtn.addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.download = 'kids-bank-sync-qr.png';
+                link.href = qrImg.src;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+            qrCodeContainer.appendChild(document.createElement('br'));
+            qrCodeContainer.appendChild(downloadBtn);
+        } else {
+             // If qrcodejs uses canvas (older browsers or config), handle canvas too
+             const canvas = qrCodeContainer.querySelector('canvas');
+             if (canvas) {
+                canvas.style.maxWidth = '100%';
+                canvas.style.height = 'auto';
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = 'Download QR Image';
+                downloadBtn.className = 'btn btn-outline-secondary btn-sm mt-2';
+                downloadBtn.addEventListener('click', () => {
+                    const link = document.createElement('a');
+                    link.download = 'kids-bank-sync-qr.png';
+                    link.href = canvas.toDataURL("image/png");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+                qrCodeContainer.appendChild(document.createElement('br'));
+                qrCodeContainer.appendChild(downloadBtn);
+             }
+        }
     });
 
     async function processImportedConfig(payload) {
