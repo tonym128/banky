@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kids-bank-cache-v7';
+const CACHE_NAME = 'kids-bank-cache-v8';
 const urlsToCache = [
     '/',
     'index.html',
@@ -30,6 +30,12 @@ self.addEventListener('install', event => {
                 return cache.addAll(urlsToCache);
             })
     );
+});
+
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 self.addEventListener('activate', event => {
