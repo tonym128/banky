@@ -12,6 +12,7 @@ export function initUI() {
     const accountImageInput = document.getElementById('account-image');
     const importFileInput = document.getElementById('import-file');
     const exportDataBtn = document.getElementById('export-data-btn');
+    const importDataBtn = document.getElementById('import-data-btn');
     const accountsContainer = document.getElementById('accounts-container');
     
     // Cloud Sync UI Elements
@@ -92,6 +93,10 @@ export function initUI() {
         a.download = 'kids-bank-data.json';
         a.click();
         URL.revokeObjectURL(url);
+    });
+
+    importDataBtn.addEventListener('click', () => {
+        importFileInput.click();
     });
 
     importFileInput.addEventListener('change', () => {
