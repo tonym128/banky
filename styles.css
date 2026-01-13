@@ -6,3 +6,29 @@ h1 {
     color: #0056b3;
 }
 
+#account-context-menu .modal-content {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: none;
+}
+
+#account-context-menu .modal-header {
+    border-bottom: none;
+    padding: 0.75rem 1rem;
+}
+
+#account-context-menu .modal-body {
+    padding: 0.5rem;
+}
+
+#account-context-menu .modal-body a {
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.15s ease-in-out;
+}
+
+#account-context-menu .modal-body a:hover {
+    background-color: #f1f1f1;
+    text-decoration: none;
+}
+
