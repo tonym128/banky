@@ -68,7 +68,10 @@ async function getCryptoKey() {
 function normalizeTransactions(txs) {
     return (txs || []).map(tx => {
         if (!tx.id) {
-            return { ...tx, id: crypto.randomUUID() };
+            return { ...tx, id: crypto.randomUUID(), timestamp: Date.now() };
+        }
+        if (!tx.timestamp) {
+            return { ...tx, timestamp: Date.now() };
         }
         // Ensure ID is a string to prevent type mismatches during merge
         return { ...tx, id: String(tx.id) };
@@ -96,7 +99,7 @@ function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
             merged[id] = local[id];
             merged[id].transactions = normalizeTransactions(merged[id].transactions);
         } else {
-            // Merge transactions
+            // Merge transactions using LWW
             const localTx = normalizeTransactions(local[id].transactions);
             const cloudTx = normalizeTransactions(merged[id].transactions);
             
@@ -104,7 +107,16 @@ function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
             // Cloud transactions first
             cloudTx.forEach(tx => txMap.set(String(tx.id), tx));
             // Local transactions overwrite/add
-            localTx.forEach(tx => txMap.set(String(tx.id), tx));
+            localTx.forEach(tx => {
+                const existingTx = txMap.get(String(tx.id));
+                if (existingTx) {
+                    if (tx.timestamp > existingTx.timestamp) {
+                        txMap.set(String(tx.id), tx);
+                    }
+                } else {
+                    txMap.set(String(tx.id), tx);
+                }
+            });
             
             merged[id].transactions = Array.from(txMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
             
