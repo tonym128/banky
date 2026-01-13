@@ -505,7 +505,8 @@ export function initUI() {
             const transactionIndex = accounts[accountId].transactions.findIndex(tx => String(tx.id) === transactionId);
             
             if (transactionIndex > -1) {
-                accounts[accountId].transactions.splice(transactionIndex, 1);
+                accounts[accountId].transactions[transactionIndex].deleted = true;
+                accounts[accountId].transactions[transactionIndex].timestamp = Date.now();
                 saveState();
                 renderAll();
             }
@@ -553,7 +554,7 @@ function renderAccounts() {
         if (account.image) {
             imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-2" style="width: 30px; height: 30px;">`;
         }
-        const balance = account.transactions.reduce((sum, tx) => sum + tx.amount, 0);
+        const balance = account.transactions.filter(tx => !tx.deleted).reduce((sum, tx) => sum + tx.amount, 0);
         button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
 
         button.addEventListener('contextmenu', (e) => {
@@ -656,14 +657,14 @@ function renderAccounts() {
         const monthSelect = document.getElementById(`month-select-${id}`);
         const yearSelect = document.getElementById(`year-select-${id}`);
 
-        const years = [...new Set(account.transactions.map(tx => new Date(tx.date).getFullYear()))];
+        const years = [...new Set(account.transactions.filter(tx => !tx.deleted).map(tx => new Date(tx.date).getFullYear()))];
         yearSelect.innerHTML = '<option value="-1">All</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
 
         const updateTransactions = () => {
             const selectedMonth = parseInt(monthSelect.value, 10);
             const selectedYear = parseInt(yearSelect.value, 10);
 
-            let filteredTransactions = account.transactions;
+            let filteredTransactions = account.transactions.filter(tx => !tx.deleted);
 
             if (selectedYear !== -1) {
                 filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getFullYear() === selectedYear);
@@ -673,6 +674,7 @@ function renderAccounts() {
             }
 
             const startingBalance = account.transactions
+                .filter(tx => !tx.deleted)
                 .filter(tx => {
                     const txDate = new Date(tx.date);
                     if (selectedYear === -1) return false;

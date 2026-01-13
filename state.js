@@ -118,7 +118,9 @@ function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
                 }
             });
             
-            merged[id].transactions = Array.from(txMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
+            merged[id].transactions = Array.from(txMap.values())
+                .filter(tx => !tx.deleted)
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
             
             // Prefer local for metadata if it exists
             merged[id].name = local[id].name || merged[id].name;
