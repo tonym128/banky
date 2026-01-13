@@ -1,5 +1,5 @@
 // ui.js
-import { accounts, saveState, setAccounts, deletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
+import { accounts, saveState, setAccounts, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 
@@ -110,7 +110,7 @@ export function initUI() {
                     let importedDeletedAccountIds = importedPayload.deletedAccountIds || [];
                     
                     setAccounts(importedAccounts, true);
-                    deletedAccountIds = importedDeletedAccountIds; // Update deletedAccountIds
+                    setDeletedAccountIds(importedDeletedAccountIds); // Update deletedAccountIds
                     saveState();
                     renderAll();
                     alert('Data imported successfully. Any previously deleted accounts in this file have been restored.');

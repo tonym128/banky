@@ -35,6 +35,10 @@ export function setAccounts(newAccounts, clearDeletedIds = false) {
     }
 }
 
+export function setDeletedAccountIds(newDeletedAccountIds) {
+    deletedAccountIds = newDeletedAccountIds;
+}
+
 export function setCloudSyncEnabled(enabled) {
     cloudSyncEnabled = enabled;
     localStorage.setItem('cloudSyncEnabled', JSON.stringify(enabled));
