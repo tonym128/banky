@@ -1,5 +1,5 @@
 // ui.js
-import { accounts, saveState, setSyncFile, setAutoSyncEnabled, autoSyncEnabled, fsaSupported, setAccounts, fileHandle, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
+import { accounts, saveState, setAccounts, deletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 
@@ -10,9 +10,8 @@ export function initUI() {
     const addAccountBtn = document.getElementById('add-account-btn');
     const accountNameInput = document.getElementById('account-name');
     const accountImageInput = document.getElementById('account-image');
-    const setSyncFileBtn = document.getElementById('set-sync-file-btn');
     const importFileInput = document.getElementById('import-file');
-    const autoSyncToggle = document.getElementById('auto-sync-toggle');
+    const exportDataBtn = document.getElementById('export-data-btn');
     const accountsContainer = document.getElementById('accounts-container');
     
     // Cloud Sync UI Elements
@@ -47,7 +46,6 @@ export function initUI() {
     const removeImageLink = document.getElementById('remove-image-link');
     const editAccountImageInput = document.getElementById('edit-account-image');
 
-    autoSyncToggle.checked = autoSyncEnabled;
     cloudSyncToggle.checked = cloudSyncEnabled;
 
     if (cloudSyncEnabled) {
@@ -85,25 +83,38 @@ export function initUI() {
         updateModeVisibility();
     }
 
-    if (!fsaSupported) {
-        setSyncFileBtn.textContent = 'Export';
-        const importBtn = document.createElement('button');
-        importBtn.textContent = 'Import';
-        importBtn.className = 'btn btn-secondary';
-        importBtn.addEventListener('click', () => importFileInput.click());
-        setSyncFileBtn.insertAdjacentElement('afterend', importBtn);
-    }
+    exportDataBtn.addEventListener('click', () => {
+        const data = { accounts, deletedAccountIds };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'kids-bank-data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
 
-    setSyncFileBtn.addEventListener('click', setSyncFile);
-
-    autoSyncToggle.addEventListener('change', async () => {
-        setAutoSyncEnabled(autoSyncToggle.checked);
-        localStorage.setItem('autoSyncEnabled', JSON.stringify(autoSyncEnabled));
-        if (autoSyncEnabled) {
-            if (fsaSupported && !fileHandle) {
-                await setSyncFile();
-            }
-            saveState();
+    importFileInput.addEventListener('change', () => {
+        const file = importFileInput.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedPayload = JSON.parse(e.target.result);
+                    let importedAccounts = importedPayload.accounts || importedPayload; // Handle wrapped or direct accounts
+                    let importedDeletedAccountIds = importedPayload.deletedAccountIds || [];
+                    
+                    setAccounts(importedAccounts, true);
+                    deletedAccountIds = importedDeletedAccountIds; // Update deletedAccountIds
+                    saveState();
+                    renderAll();
+                    alert('Data imported successfully. Any previously deleted accounts in this file have been restored.');
+                } catch (error) {
+                    console.error(error);
+                    alert('Invalid JSON file.');
+                }
+            };
+            reader.readAsText(file);
         }
     });
 

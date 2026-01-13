@@ -9,10 +9,6 @@ export let deletedAccountIds = JSON.parse(localStorage.getItem('deletedAccountId
 // Track accounts explicitly restored via import to protect them from cloud tombstones
 export let restoredAccountIds = JSON.parse(localStorage.getItem('restoredAccountIds')) || [];
 
-export let fileHandle = null;
-export let autoSyncEnabled = JSON.parse(localStorage.getItem('autoSyncEnabled')) || false;
-export let fsaSupported = 'showOpenFilePicker' in window;
-
 // Cloud Sync State
 export let cloudSyncEnabled = JSON.parse(localStorage.getItem('cloudSyncEnabled')) || false;
 export let syncGuid = localStorage.getItem('syncGuid') || null;
@@ -37,14 +33,6 @@ export function setAccounts(newAccounts, clearDeletedIds = false) {
         localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
         localStorage.setItem('restoredAccountIds', JSON.stringify(restoredAccountIds));
     }
-}
-
-export function setFileHandle(newFileHandle) {
-    fileHandle = newFileHandle;
-}
-
-export function setAutoSyncEnabled(enabled) {
-    autoSyncEnabled = enabled;
 }
 
 export function setCloudSyncEnabled(enabled) {
@@ -213,39 +201,6 @@ export async function loadInitialFile() {
     if (cloudSyncEnabled && getCloudConfig()) {
         await syncWithCloud();
     }
-
-    if (!fsaSupported) return;
-    fileHandle = await get('fileHandle');
-    if (fileHandle) {
-        if (await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted') {
-            await loadData();
-        }
-    }
-}
-
-export async function loadData() {
-    if (!fileHandle) return;
-    try {
-        const file = await fileHandle.getFile();
-        const contents = await file.text();
-        if (contents) {
-            const parsed = JSON.parse(contents);
-             // Handle legacy format vs new format
-            if (parsed.accounts && Array.isArray(parsed.deletedIds)) {
-                accounts = parsed.accounts;
-                deletedAccountIds = parsed.deletedIds;
-            } else {
-                accounts = parsed;
-                // Keep existing deletedIds if loading legacy file
-            }
-            localStorage.setItem('accounts', JSON.stringify(accounts));
-            localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
-            renderAll();
-        }
-    } catch (error) {
-        console.error('Failed to load data:', error);
-        alert('Failed to load data from the sync file.');
-    }
 }
 
 export async function loadFromCloud() {
@@ -266,34 +221,6 @@ export async function loadFromCloud() {
     return null;
 }
 
-export async function setSyncFile() {
-    if (!fsaSupported) {
-        const exportData = { accounts, deletedIds: deletedAccountIds };
-        const data = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'kids-bank-data.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        return;
-    }
-
-    try {
-        [fileHandle] = await window.showOpenFilePicker({
-            types: [{
-                description: 'JSON Files',
-                accept: { 'application/json': ['.json'] }
-            }]
-        });
-        await set('fileHandle', fileHandle);
-        await loadData();
-    } catch (error) {
-        console.error('Failed to set sync file:', error);
-    }
-}
-
 export function debounce(func, delay) {
     let timeout;
     return function(...args) {
@@ -304,23 +231,6 @@ export function debounce(func, delay) {
 }
 
 export const autoExport = debounce(async () => {
-    const exportData = { accounts, deletedIds: deletedAccountIds };
-
-    // Local File Sync
-    if (autoSyncEnabled) {
-        if (fsaSupported && fileHandle) {
-            if (await fileHandle.queryPermission({ mode: 'readwrite' }) === 'granted') {
-                try {
-                    const writable = await fileHandle.createWritable();
-                    await writable.write(JSON.stringify(exportData, null, 2));
-                    await writable.close();
-                } catch (error) {
-                    console.error('Failed to auto-sync to file:', error);
-                }
-            }
-        }
-    }
-
     // Cloud Sync
     if (cloudSyncEnabled && syncGuid && encryptionKeyJwk) {
         await syncWithCloud();
