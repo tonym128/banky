@@ -3,6 +3,34 @@ import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setD
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 
+const logBuffer = [];
+const originalLog = console.log;
+const originalError = console.error;
+
+function formatLog(level, args) {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => {
+        try {
+            return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+        } catch (e) {
+            return String(arg);
+        }
+    }).join(' ');
+    return `[${timestamp}] [${level}] ${message}`;
+}
+
+console.log = function(...args) {
+    logBuffer.push(formatLog('INFO', args));
+    if (logBuffer.length > 1000) logBuffer.shift(); 
+    originalLog.apply(console, args);
+};
+
+console.error = function(...args) {
+    logBuffer.push(formatLog('ERROR', args));
+    if (logBuffer.length > 1000) logBuffer.shift();
+    originalError.apply(console, args);
+};
+
 let charts = {};
 let currentAccountId = null;
 
@@ -67,7 +95,29 @@ export function initUI() {
     const qrCodeContainer = document.getElementById('qr-code-container');
     const importConfigText = document.getElementById('import-config-text');
     const importConfigBtn = document.getElementById('import-config-btn');
+    const showLogsBtn = document.getElementById('show-logs-btn');
+    const logsModal = new bootstrap.Modal(document.getElementById('logs-modal'));
+    const logsContainer = document.getElementById('logs-container');
+    const copyLogsBtn = document.getElementById('copy-logs-btn');
     const qrScannerModal = new bootstrap.Modal(document.getElementById('qr-scanner-modal'));
+
+    if (showLogsBtn) {
+        showLogsBtn.addEventListener('click', () => {
+            logsContainer.textContent = logBuffer.join('\n');
+            logsModal.show();
+        });
+    }
+
+    if (copyLogsBtn) {
+        copyLogsBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(logsContainer.textContent).then(() => {
+                alert('Logs copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy logs:', err);
+                alert('Failed to copy logs.');
+            });
+        });
+    }
 
     const accountContextMenu = new bootstrap.Modal(document.getElementById('account-context-menu'));
     const removeAccountLink = document.getElementById('remove-account-link');

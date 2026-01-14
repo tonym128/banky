@@ -120,6 +120,8 @@
                                 <div id="qr-code-container" class="mt-2"></div>
                                 <textarea id="import-config-text" class="form-control mt-2" placeholder="Paste Config JSON here to import" rows="3"></textarea>
                                 <button id="import-config-btn" class="btn btn-warning btn-sm mt-2">Import Config</button>
+                                <hr>
+                                <button id="show-logs-btn" class="btn btn-secondary btn-sm w-100">Show Logs</button>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -165,6 +167,25 @@
                     </div>
                     <div class="modal-body">
                         <div id="qr-reader" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Modal -->
+        <div class="modal fade" id="logs-modal" tabindex="-1" aria-labelledby="logsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="logsModalLabel">Application Logs</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <pre id="logs-container" class="bg-light p-3 border rounded" style="max-height: 500px; overflow-y: auto; font-size: 0.8rem;"></pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" id="copy-logs-btn" class="btn btn-primary">Copy Logs</button>
                     </div>
                 </div>
             </div>
