@@ -2,6 +2,7 @@
 import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount, toastConfig, setToastConfig } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
+import { resizeImage } from './utils.js';
 
 const logBuffer = [];
 const originalLog = console.log;
@@ -575,29 +576,28 @@ export function initUI() {
         }
     });
 
-    addAccountBtn.addEventListener('click', () => {
+    addAccountBtn.addEventListener('click', async () => {
         const name = accountNameInput.value.trim();
         const imageFile = accountImageInput.files[0];
 
         if (name) {
+            let image = null;
             if (imageFile) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const id = Date.now().toString();
-                    accounts[id] = { name, transactions: [], image: e.target.result };
-                    accountNameInput.value = '';
-                    accountImageInput.value = '';
-                    saveState();
-                    renderAll();
-                };
-                reader.readAsDataURL(imageFile);
-            } else {
-                const id = Date.now().toString();
-                accounts[id] = { name, transactions: [] };
-                accountNameInput.value = '';
-                saveState();
-                renderAll();
+                try {
+                    image = await resizeImage(imageFile);
+                } catch (e) {
+                    console.error("Failed to resize image", e);
+                    alert("Failed to process image.");
+                    return;
+                }
             }
+            
+            const id = Date.now().toString();
+            accounts[id] = { name, transactions: [], image };
+            accountNameInput.value = '';
+            accountImageInput.value = '';
+            saveState();
+            renderAll();
         }
     });
 
@@ -626,16 +626,18 @@ export function initUI() {
         accountContextMenu.hide();
     });
 
-    editAccountImageInput.addEventListener('change', () => {
+    editAccountImageInput.addEventListener('change', async () => {
         const file = editAccountImageInput.files[0];
         if (file && currentAccountId) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                accounts[currentAccountId].image = e.target.result;
+            try {
+                const resized = await resizeImage(file);
+                accounts[currentAccountId].image = resized;
                 saveState();
                 renderAll();
-            };
-            reader.readAsDataURL(file);
+            } catch (e) {
+                console.error("Failed to resize image", e);
+                alert("Failed to process image.");
+            }
         }
     });
 
