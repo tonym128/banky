@@ -1,10 +1,38 @@
 // ui.js
-import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
+import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount, toastConfig, setToastConfig } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 
 let charts = {};
 let currentAccountId = null;
+
+export function showToast(message, type = 'info') {
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) return;
+
+    const toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+
+    toastContainer.appendChild(toastEl);
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+    
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        toastEl.remove();
+    });
+}
 
 export function initUI() {
     const addAccountBtn = document.getElementById('add-account-btn');
@@ -46,6 +74,41 @@ export function initUI() {
     const addEditImageLink = document.getElementById('add-edit-image-link');
     const removeImageLink = document.getElementById('remove-image-link');
     const editAccountImageInput = document.getElementById('edit-account-image');
+
+    // Toast Config UI
+    const toastEnabledCheckbox = document.getElementById('toast-enabled');
+    const toastSyncStartCheckbox = document.getElementById('toast-sync-start');
+    const toastSyncSuccessCheckbox = document.getElementById('toast-sync-success');
+
+    if (toastEnabledCheckbox && toastSyncStartCheckbox && toastSyncSuccessCheckbox) {
+        toastEnabledCheckbox.checked = toastConfig.enabled;
+        toastSyncStartCheckbox.checked = toastConfig.showSyncStart;
+        toastSyncSuccessCheckbox.checked = toastConfig.showSyncSuccess;
+
+        function updateToastUI() {
+            const enabled = toastEnabledCheckbox.checked;
+            toastSyncStartCheckbox.disabled = !enabled;
+            toastSyncSuccessCheckbox.disabled = !enabled;
+            // Visual cue for disabled state (Bootstrap handles disabled input, but maybe opacity for label?)
+            // Bootstrap should handle standard disabled look.
+        }
+
+        function updateToastConfig() {
+            updateToastUI();
+            setToastConfig({
+                enabled: toastEnabledCheckbox.checked,
+                showSyncStart: toastSyncStartCheckbox.checked,
+                showSyncSuccess: toastSyncSuccessCheckbox.checked
+            });
+        }
+
+        toastEnabledCheckbox.addEventListener('change', updateToastConfig);
+        toastSyncStartCheckbox.addEventListener('change', updateToastConfig);
+        toastSyncSuccessCheckbox.addEventListener('change', updateToastConfig);
+        
+        // Initialize UI state
+        updateToastUI();
+    }
 
     cloudSyncToggle.checked = cloudSyncEnabled;
 

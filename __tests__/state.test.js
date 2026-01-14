@@ -1,4 +1,4 @@
-import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails, replaceState, setDeletedAccountIds } from '../state.js';
+import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails, replaceState, setDeletedAccountIds, setToastConfig } from '../state.js';
 import * as ui from '../ui.js';
 import * as s3 from '../s3.js';
 import * as idb from '../idb.js';
@@ -6,7 +6,8 @@ import * as encryption from '../encryption.js';
 
 // Mock dependencies
 jest.mock('../ui.js', () => ({
-    renderAll: jest.fn()
+    renderAll: jest.fn(),
+    showToast: jest.fn()
 }));
 
 jest.mock('../s3.js', () => ({
@@ -193,5 +194,40 @@ describe('State Module', () => {
         expect(encryption.decryptData).toHaveBeenCalled();
         // Should NOT upload
         expect(s3.uploadToS3).not.toHaveBeenCalled();
+    });
+
+    test('syncWithCloud: shows toasts when enabled', async () => {
+        setCloudSyncEnabled(true);
+        setSyncDetails('test-guid-toast', { k: 'key' });
+        
+        // Enable Toasts
+        setToastConfig({ enabled: true, showSyncStart: true, showSyncSuccess: true });
+
+        // Mock download to force upload path (non-identical)
+        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
+        setAccounts({ 'acc1': { id: 'acc1', transactions: [] } });
+
+        await syncWithCloud();
+
+        expect(ui.showToast).toHaveBeenCalledWith('Syncing with cloud...', 'info');
+        expect(ui.showToast).toHaveBeenCalledWith('Sync Complete', 'success');
+    });
+
+    test('syncWithCloud: does not show toasts when disabled', async () => {
+        setCloudSyncEnabled(true);
+        setSyncDetails('test-guid-toast-off', { k: 'key' });
+        
+        // Disable Toasts
+        setToastConfig({ enabled: false });
+
+        // Mock download
+        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
+        setAccounts({ 'acc1': { id: 'acc1', transactions: [] } });
+
+        await syncWithCloud();
+
+        expect(ui.showToast).not.toHaveBeenCalled();
     });
 });

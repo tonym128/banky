@@ -61,6 +61,23 @@
                             <input type="file" id="import-file" accept=".json" style="display: none;">
                         </div>
                         <div class="mb-3">
+                            <h3>Notifications</h3>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="toast-enabled" checked>
+                                <label class="form-check-label" for="toast-enabled">Enable Toasts</label>
+                            </div>
+                            <div class="ms-3 mt-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="toast-sync-start" checked>
+                                    <label class="form-check-label" for="toast-sync-start">Show "Sync Started"</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="toast-sync-success" checked>
+                                    <label class="form-check-label" for="toast-sync-success">Show "Sync Success"</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
                             <h3>Cloud Sync (S3)</h3>
                             <div class="form-check form-switch mt-2">
                                 <input class="form-check-input" type="checkbox" id="cloud-sync-toggle">

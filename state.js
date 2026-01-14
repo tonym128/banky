@@ -1,5 +1,5 @@
 // state.js
-import { renderAll } from './ui.js';
+import { renderAll, showToast } from './ui.js';
 import { get, set } from './idb.js';
 import { uploadToS3, downloadFromS3, getCloudConfig } from './s3.js';
 import { encryptData, decryptData, importKey, generateKey, exportKey } from './encryption.js';
@@ -8,6 +8,14 @@ export let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
 export let deletedAccountIds = JSON.parse(localStorage.getItem('deletedAccountIds')) || [];
 // Track accounts explicitly restored via import to protect them from cloud tombstones
 export let restoredAccountIds = JSON.parse(localStorage.getItem('restoredAccountIds')) || [];
+
+// Toast Config
+export let toastConfig = JSON.parse(localStorage.getItem('toastConfig')) || { enabled: true, showSyncStart: true, showSyncSuccess: true };
+
+export function setToastConfig(config) {
+    toastConfig = { ...toastConfig, ...config };
+    localStorage.setItem('toastConfig', JSON.stringify(toastConfig));
+}
 
 // Cloud Sync State
 export let cloudSyncEnabled = JSON.parse(localStorage.getItem('cloudSyncEnabled')) || false;
@@ -195,6 +203,9 @@ export async function syncWithCloud() {
     isSyncing = true;
     try {
         console.log("Starting full cloud sync (Merge & Upload)...");
+        if (toastConfig.enabled && toastConfig.showSyncStart) {
+            showToast('Syncing with cloud...', 'info');
+        }
         const cloudDataPayload = await loadFromCloud();
         
         let mergedResult;
@@ -230,12 +241,18 @@ export async function syncWithCloud() {
         // Optimization: Check if merged state differs from cloud state before uploading
         if (cloudStateToCompare && deepEqual(mergedResult, cloudStateToCompare)) {
             console.log("Local state is identical to cloud state. Skipping upload.");
+            if (toastConfig.enabled && toastConfig.showSyncSuccess) {
+                showToast('Sync Complete (No changes)', 'success');
+            }
         } else {
             const key = await getCryptoKey();
             // Upload the new wrapper structure
             const encrypted = await encryptData(mergedResult, key);
             await uploadToS3(encrypted, syncGuid);
             console.log("Cloud sync completed successfully (Uploaded).");
+            if (toastConfig.enabled && toastConfig.showSyncSuccess) {
+                showToast('Sync Complete', 'success');
+            }
         }
         
         // If upload successful (or skipped), we can clear the restoration protection
