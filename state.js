@@ -1,8 +1,8 @@
 // state.js
-import { renderAll, showToast, updateSyncIcon } from './ui.js';
 import { get, set } from './idb.js';
 import { uploadToS3, downloadFromS3, getCloudConfig } from './s3.js';
 import { encryptData, decryptData, importKey, generateKey, exportKey } from './encryption.js';
+import { PubSub, EVENTS } from './pubsub.js';
 
 export let accounts = JSON.parse(localStorage.getItem('accounts')) || {};
 export let deletedAccountIds = JSON.parse(localStorage.getItem('deletedAccountIds')) || [];
@@ -50,7 +50,7 @@ export function setDeletedAccountIds(newDeletedAccountIds) {
 export function setCloudSyncEnabled(enabled) {
     cloudSyncEnabled = enabled;
     localStorage.setItem('cloudSyncEnabled', JSON.stringify(enabled));
-    updateSyncIcon(enabled ? 'synced' : 'disabled'); // Assume synced if enabled until sync runs
+    PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, enabled ? 'synced' : 'disabled'); // Assume synced if enabled until sync runs
 }
 
 export function setSyncDetails(guid, keyJwk) {
@@ -202,11 +202,11 @@ export async function syncWithCloud() {
     if (!cloudSyncEnabled || !syncGuid || !encryptionKeyJwk || isSyncing) return;
     
     isSyncing = true;
-    updateSyncIcon('syncing');
+    PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'syncing');
     try {
         console.log("Starting full cloud sync (Merge & Upload)...");
         if (toastConfig.enabled && toastConfig.showSyncStart) {
-            showToast('Syncing with cloud...', 'info');
+            PubSub.publish(EVENTS.TOAST_NOTIFICATION, { message: 'Syncing with cloud...', type: 'info' });
         }
         const cloudDataPayload = await loadFromCloud();
         
@@ -234,7 +234,7 @@ export async function syncWithCloud() {
             
             localStorage.setItem('accounts', JSON.stringify(accounts));
             localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
-            renderAll();
+            PubSub.publish(EVENTS.STATE_UPDATED);
         } else {
              // If no cloud data, just prepare local for upload
              mergedResult = { accounts, deletedIds: deletedAccountIds };
@@ -243,9 +243,9 @@ export async function syncWithCloud() {
         // Optimization: Check if merged state differs from cloud state before uploading
         if (cloudStateToCompare && deepEqual(mergedResult, cloudStateToCompare)) {
             console.log("Local state is identical to cloud state. Skipping upload.");
-            updateSyncIcon('synced');
+            PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'synced');
             if (toastConfig.enabled && toastConfig.showSyncSuccess) {
-                showToast('Sync Complete (No changes)', 'success');
+                PubSub.publish(EVENTS.TOAST_NOTIFICATION, { message: 'Sync Complete (No changes)', type: 'success' });
             }
         } else {
             const key = await getCryptoKey();
@@ -253,9 +253,9 @@ export async function syncWithCloud() {
             const encrypted = await encryptData(mergedResult, key);
             await uploadToS3(encrypted, syncGuid);
             console.log("Cloud sync completed successfully (Uploaded).");
-            updateSyncIcon('synced');
+            PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'synced');
             if (toastConfig.enabled && toastConfig.showSyncSuccess) {
-                showToast('Sync Complete', 'success');
+                PubSub.publish(EVENTS.TOAST_NOTIFICATION, { message: 'Sync Complete', type: 'success' });
             }
         }
         
@@ -267,14 +267,14 @@ export async function syncWithCloud() {
 
     } catch (error) {
         console.error("Cloud sync failed:", error);
-        updateSyncIcon('error');
+        PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'error');
     } finally {
         isSyncing = false;
     }
 }
 
 export async function loadInitialFile() {
-    updateSyncIcon(cloudSyncEnabled ? 'synced' : 'disabled'); // Initial state
+    PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, cloudSyncEnabled ? 'synced' : 'disabled'); // Initial state
     // Try Cloud Sync first if enabled
     if (cloudSyncEnabled && getCloudConfig()) {
         await syncWithCloud();
@@ -350,10 +350,10 @@ export function saveState() {
 
 window.addEventListener('online', () => {
     console.log('Connection restored. Triggering sync...');
-    updateSyncIcon('syncing'); // Immediate feedback
+    PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'syncing'); // Immediate feedback
     syncWithCloud();
 });
 
 window.addEventListener('offline', () => {
-    updateSyncIcon('offline');
+    PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'offline');
 });

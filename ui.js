@@ -1,8 +1,9 @@
 // ui.js
-import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount, toastConfig, setToastConfig } from './state.js';
+import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, removeAccount, toastConfig, setToastConfig, loadFromCloud } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 import { resizeImage } from './utils.js';
+import { PubSub, EVENTS } from './pubsub.js';
 
 const logBuffer = [];
 const originalLog = console.log;
@@ -95,6 +96,11 @@ export function updateSyncIcon(status) {
 }
 
 export function initUI() {
+    // Subscribe to state changes
+    PubSub.subscribe(EVENTS.STATE_UPDATED, () => renderAll());
+    PubSub.subscribe(EVENTS.SYNC_STATUS_CHANGED, (status) => updateSyncIcon(status));
+    PubSub.subscribe(EVENTS.TOAST_NOTIFICATION, (data) => showToast(data.message, data.type));
+
     const addAccountBtn = document.getElementById('add-account-btn');
     const accountNameInput = document.getElementById('account-name');
     const accountImageInput = document.getElementById('account-image');

@@ -1,14 +1,25 @@
 import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails, replaceState, setDeletedAccountIds, setToastConfig } from '../state.js';
-import * as ui from '../ui.js';
 import * as s3 from '../s3.js';
 import * as idb from '../idb.js';
 import * as encryption from '../encryption.js';
+import { PubSub, EVENTS } from '../pubsub.js';
 
 // Mock dependencies
 jest.mock('../ui.js', () => ({
-    renderAll: jest.fn(),
-    showToast: jest.fn(),
-    updateSyncIcon: jest.fn()
+    // UI module is no longer directly called by state, so we don't need to mock its exports for these tests
+    // unless there are other side effects. State doesn't import UI anymore.
+}));
+
+jest.mock('../pubsub.js', () => ({
+    PubSub: {
+        publish: jest.fn(),
+        subscribe: jest.fn()
+    },
+    EVENTS: {
+        STATE_UPDATED: 'STATE_UPDATED',
+        SYNC_STATUS_CHANGED: 'SYNC_STATUS_CHANGED',
+        TOAST_NOTIFICATION: 'TOAST_NOTIFICATION'
+    }
 }));
 
 jest.mock('../s3.js', () => ({
@@ -147,8 +158,8 @@ describe('State Module', () => {
         expect(accounts['local-acc']).toBeDefined();
         expect(accounts['cloud-acc']).toBeDefined();
 
-        // Check if render was called
-        expect(ui.renderAll).toHaveBeenCalled();
+        // Check if render was triggered via PubSub
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.STATE_UPDATED);
 
         // Check if upload happened
         expect(encryption.encryptData).toHaveBeenCalled();
@@ -211,8 +222,8 @@ describe('State Module', () => {
 
         await syncWithCloud();
 
-        expect(ui.showToast).toHaveBeenCalledWith('Syncing with cloud...', 'info');
-        expect(ui.showToast).toHaveBeenCalledWith('Sync Complete', 'success');
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.TOAST_NOTIFICATION, { message: 'Syncing with cloud...', type: 'info' });
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.TOAST_NOTIFICATION, { message: 'Sync Complete', type: 'success' });
     });
 
     test('syncWithCloud: does not show toasts when disabled', async () => {
@@ -229,7 +240,7 @@ describe('State Module', () => {
 
         await syncWithCloud();
 
-        expect(ui.showToast).not.toHaveBeenCalled();
+        expect(PubSub.publish).not.toHaveBeenCalledWith(EVENTS.TOAST_NOTIFICATION, expect.anything());
     });
 
     test('syncWithCloud: updates sync icon status', async () => {
@@ -241,8 +252,8 @@ describe('State Module', () => {
         
         await syncWithCloud();
 
-        expect(ui.updateSyncIcon).toHaveBeenCalledWith('syncing');
-        expect(ui.updateSyncIcon).toHaveBeenCalledWith('synced');
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.SYNC_STATUS_CHANGED, 'syncing');
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.SYNC_STATUS_CHANGED, 'synced');
     });
 
     test('syncWithCloud: updates sync icon on error', async () => {
@@ -253,7 +264,7 @@ describe('State Module', () => {
         
         await syncWithCloud();
 
-        expect(ui.updateSyncIcon).toHaveBeenCalledWith('syncing');
-        expect(ui.updateSyncIcon).toHaveBeenCalledWith('error');
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.SYNC_STATUS_CHANGED, 'syncing');
+        expect(PubSub.publish).toHaveBeenCalledWith(EVENTS.SYNC_STATUS_CHANGED, 'error');
     });
 });
