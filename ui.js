@@ -597,7 +597,7 @@ export function initUI() {
             accountNameInput.value = '';
             accountImageInput.value = '';
             saveState();
-            renderAll();
+            renderAll(id);
         }
     });
 
@@ -605,7 +605,7 @@ export function initUI() {
         e.preventDefault();
         if (currentAccountId && confirm('Are you sure you want to remove this account?')) {
             removeAccount(currentAccountId);
-            renderAll();
+            renderAll(currentAccountId);
         }
         accountContextMenu.hide();
     });
@@ -621,7 +621,7 @@ export function initUI() {
         if (currentAccountId && accounts[currentAccountId].image) {
             delete accounts[currentAccountId].image;
             saveState();
-            renderAll();
+            renderAll(currentAccountId);
         }
         accountContextMenu.hide();
     });
@@ -633,7 +633,7 @@ export function initUI() {
                 const resized = await resizeImage(file);
                 accounts[currentAccountId].image = resized;
                 saveState();
-                renderAll();
+                renderAll(currentAccountId);
             } catch (e) {
                 console.error("Failed to resize image", e);
                 alert("Failed to process image.");
@@ -653,7 +653,7 @@ export function initUI() {
                 accounts[accountId].transactions[transactionIndex].deleted = true;
                 accounts[accountId].transactions[transactionIndex].timestamp = Date.now();
                 saveState();
-                renderAll();
+                renderAll(accountId);
             }
         }
     });
@@ -661,231 +661,261 @@ export function initUI() {
     renderAll();
 }
 
-export function renderAll() {
-    const activeAccountIds = [...document.querySelectorAll('.accordion-collapse.show')].map(el => el.id.replace('collapse-', ''));
-    renderAccounts();
-    activeAccountIds.forEach(id => {
-        const accountCollapse = document.getElementById(`collapse-${id}`);
-        if (accountCollapse) {
-            new bootstrap.Collapse(accountCollapse, {
-                toggle: true
-            });
+export function renderAll(accountId = null) {
+    if (accountId) {
+        const account = accounts[accountId];
+        const existingEl = document.querySelector(`.accordion-item[data-account-id="${accountId}"]`);
+
+        if (!account) {
+            if (existingEl) existingEl.remove();
+            return;
         }
-    });
+
+        const newEl = createAccountElement(accountId, account);
+
+        if (existingEl) {
+            const wasOpen = existingEl.querySelector('.accordion-collapse').classList.contains('show');
+            if (wasOpen) {
+                const collapse = newEl.querySelector('.accordion-collapse');
+                collapse.classList.add('show');
+                const btn = newEl.querySelector('.accordion-button');
+                btn.classList.remove('collapsed');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+            existingEl.replaceWith(newEl);
+        } else {
+            document.getElementById('accounts-container').appendChild(newEl);
+        }
+    } else {
+        const activeAccountIds = [...document.querySelectorAll('.accordion-collapse.show')].map(el => el.id.replace('collapse-', ''));
+        renderAccounts();
+        activeAccountIds.forEach(id => {
+            const accountCollapse = document.getElementById(`collapse-${id}`);
+            if (accountCollapse) {
+                new bootstrap.Collapse(accountCollapse, {
+                    toggle: true
+                });
+            }
+        });
+    }
 }
 
 function renderAccounts() {
     const accountsContainer = document.getElementById('accounts-container');
     accountsContainer.innerHTML = '';
     for (const id in accounts) {
-        const account = accounts[id];
-        const accountBox = document.createElement('div');
-        accountBox.className = 'accordion-item';
-        accountBox.dataset.accountId = id;
-
-        const header = document.createElement('h2');
-        header.className = 'accordion-header';
-        header.id = `heading-${id}`;
-
-        const button = document.createElement('button');
-        button.className = 'accordion-button collapsed';
-        button.type = 'button';
-        button.dataset.bsToggle = 'collapse';
-        button.dataset.bsTarget = `#collapse-${id}`;
-        button.setAttribute('aria-expanded', 'false');
-        button.setAttribute('aria-controls', `collapse-${id}`);
-
-        let imageHtml = '';
-        if (account.image) {
-            imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-2" style="width: 30px; height: 30px;">`;
-        }
-        const balance = account.transactions.filter(tx => !tx.deleted).reduce((sum, tx) => sum + tx.amount, 0);
-        button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
-
-        button.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            currentAccountId = id;
-            const accountContextMenu = new bootstrap.Modal(document.getElementById('account-context-menu'));
-            accountContextMenu.show();
-        });
-
-        header.appendChild(button);
-        accountBox.appendChild(header);
-
-        const contentContainer = document.createElement('div');
-        contentContainer.id = `collapse-${id}`;
-        contentContainer.className = 'accordion-collapse collapse';
-        contentContainer.setAttribute('aria-labelledby', `heading-${id}`);
-        contentContainer.dataset.bsParent = '#accounts-container';
-
-        const content = document.createElement('div');
-        content.className = 'accordion-body';
-
-        const earnSpendSection = document.createElement('div');
-        earnSpendSection.className = 'row';
-        earnSpendSection.innerHTML = `
-            <div class="col-md-6">
-                <div class="card bg-success-subtle mb-3">
-                    <div class="card-body">
-                        <h5 class="card-title">Earn</h5>
-                        <input type="date" id="earn-date-${id}" class="form-control mb-2">
-                        <input type="text" id="earn-description-${id}" class="form-control mb-2" placeholder="Description">
-                        <input type="number" id="earn-amount-${id}" class="form-control mb-2" placeholder="Amount">
-                        <button id="earn-btn-${id}" class="btn btn-success">Save</button>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card bg-danger-subtle mb-3">
-                    <div class="card-body">
-                        <h5 class="card-title">Spend</h5>
-                        <input type="date" id="spend-date-${id}" class="form-control mb-2">
-                        <input type="text" id="spend-description-${id}" class="form-control mb-2" placeholder="Description">
-                        <input type="number" id="spend-amount-${id}" class="form-control mb-2" placeholder="Amount">
-                        <button id="spend-btn-${id}" class="btn btn-danger">Save</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        content.appendChild(earnSpendSection);
-
-        const graphHeader = document.createElement('h3');
-        graphHeader.textContent = 'Balance History';
-        content.appendChild(graphHeader);
-
-        const canvas = document.createElement('canvas');
-        content.appendChild(canvas);
-
-        const transactionHeader = document.createElement('h3');
-        transactionHeader.textContent = 'Transactions';
-        content.appendChild(transactionHeader);
-
-        const dateFilterSection = document.createElement('div');
-        dateFilterSection.className = 'row mb-3';
-        dateFilterSection.innerHTML = `
-            <div class="col-md-4">
-                <label for="month-select-${id}" class="form-label">Month</label>
-                <select id="month-select-${id}" class="form-select">
-                    <option value="-1">All</option>
-                    ${[...Array(12).keys()].map(i => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'long' })}</option>`).join('')}
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label for="year-select-${id}" class="form-label">Year</label>
-                <select id="year-select-${id}" class="form-select"></select>
-            </div>
-        `;
-        content.appendChild(dateFilterSection);
-
-        const startingBalanceEl = document.createElement('p');
-        content.appendChild(startingBalanceEl);
-
-        const transactionList = document.createElement('table');
-        transactionList.className = 'table table-striped';
-        transactionList.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        `;
-        content.appendChild(transactionList);
-        
-        contentContainer.appendChild(content);
-        accountBox.appendChild(contentContainer);
-        accountsContainer.appendChild(accountBox);
-
-        const monthSelect = document.getElementById(`month-select-${id}`);
-        const yearSelect = document.getElementById(`year-select-${id}`);
-
-        const years = [...new Set(account.transactions.filter(tx => !tx.deleted).map(tx => new Date(tx.date).getFullYear()))];
-        yearSelect.innerHTML = '<option value="-1">All</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
-
-        const updateTransactions = () => {
-            const selectedMonth = parseInt(monthSelect.value, 10);
-            const selectedYear = parseInt(yearSelect.value, 10);
-
-            let filteredTransactions = account.transactions.filter(tx => !tx.deleted);
-
-            if (selectedYear !== -1) {
-                filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getFullYear() === selectedYear);
-            }
-            if (selectedMonth !== -1) {
-                filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getMonth() === selectedMonth);
-            }
-
-            const startingBalance = account.transactions
-                .filter(tx => !tx.deleted)
-                .filter(tx => {
-                    const txDate = new Date(tx.date);
-                    if (selectedYear === -1) return false;
-                    if (selectedMonth === -1) {
-                        return txDate.getFullYear() < selectedYear;
-                    }
-                    return txDate < new Date(selectedYear, selectedMonth, 1);
-                })
-                .reduce((sum, tx) => sum + tx.amount, 0);
-
-            startingBalanceEl.textContent = `Starting Balance: ${startingBalance.toFixed(2)}`;
-
-            const transactionListBody = transactionList.querySelector('tbody');
-            transactionListBody.innerHTML = '';
-            filteredTransactions.forEach((tx) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${tx.date}</td>
-                    <td>${tx.description}</td>
-                    <td>${tx.amount.toFixed(2)}</td>
-                    <td><button class="btn btn-sm btn-warning delete-transaction-btn" data-account-id="${id}" data-transaction-id="${tx.id}">Delete</button></td>
-                `;
-                transactionListBody.appendChild(row);
-            });
-            renderGraph(canvas, account, id, filteredTransactions);
-        };
-
-        monthSelect.addEventListener('change', updateTransactions);
-        yearSelect.addEventListener('change', updateTransactions);
-
-        document.getElementById(`earn-date-${id}`).valueAsDate = new Date();
-        document.getElementById(`spend-date-${id}`).valueAsDate = new Date();
-
-        document.getElementById(`earn-btn-${id}`).addEventListener('click', () => {
-            const description = document.getElementById(`earn-description-${id}`).value.trim();
-            const amount = parseFloat(document.getElementById(`earn-amount-${id}`).value);
-            let date = document.getElementById(`earn-date-${id}`).value;
-            if (!date) {
-                date = new Date().toISOString().split('T')[0];
-            }
-            if (!isNaN(amount)) {
-                accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount, timestamp: Date.now() });
-                document.getElementById(`earn-description-${id}`).value = '';
-                document.getElementById(`earn-amount-${id}`).value = '';
-                saveState();
-                renderAll();
-            }
-        });
-
-        document.getElementById(`spend-btn-${id}`).addEventListener('click', () => {
-            const description = document.getElementById(`spend-description-${id}`).value.trim();
-            const amount = parseFloat(document.getElementById(`spend-amount-${id}`).value);
-            let date = document.getElementById(`spend-date-${id}`).value;
-            if (!date) {
-                date = new Date().toISOString().split('T')[0];
-            }
-            if (!isNaN(amount)) {
-                accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount: -amount, timestamp: Date.now() });
-                document.getElementById(`spend-description-${id}`).value = '';
-                document.getElementById(`spend-amount-${id}`).value = '';
-                saveState();
-                renderAll();
-            }
-        });
-        updateTransactions();
+        accountsContainer.appendChild(createAccountElement(id, accounts[id]));
     }
+}
+
+function createAccountElement(id, account) {
+    const accountBox = document.createElement('div');
+    accountBox.className = 'accordion-item';
+    accountBox.dataset.accountId = id;
+
+    const header = document.createElement('h2');
+    header.className = 'accordion-header';
+    header.id = `heading-${id}`;
+
+    const button = document.createElement('button');
+    button.className = 'accordion-button collapsed';
+    button.type = 'button';
+    button.dataset.bsToggle = 'collapse';
+    button.dataset.bsTarget = `#collapse-${id}`;
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-controls', `collapse-${id}`);
+
+    let imageHtml = '';
+    if (account.image) {
+        imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-2" style="width: 30px; height: 30px;">`;
+    }
+    const balance = account.transactions.filter(tx => !tx.deleted).reduce((sum, tx) => sum + tx.amount, 0);
+    button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
+
+    button.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        currentAccountId = id;
+        const accountContextMenu = new bootstrap.Modal(document.getElementById('account-context-menu'));
+        accountContextMenu.show();
+    });
+
+    header.appendChild(button);
+    accountBox.appendChild(header);
+
+    const contentContainer = document.createElement('div');
+    contentContainer.id = `collapse-${id}`;
+    contentContainer.className = 'accordion-collapse collapse';
+    contentContainer.setAttribute('aria-labelledby', `heading-${id}`);
+    contentContainer.dataset.bsParent = '#accounts-container';
+
+    const content = document.createElement('div');
+    content.className = 'accordion-body';
+
+    const earnSpendSection = document.createElement('div');
+    earnSpendSection.className = 'row';
+    earnSpendSection.innerHTML = `
+        <div class="col-md-6">
+            <div class="card bg-success-subtle mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Earn</h5>
+                    <input type="date" id="earn-date-${id}" class="form-control mb-2">
+                    <input type="text" id="earn-description-${id}" class="form-control mb-2" placeholder="Description">
+                    <input type="number" id="earn-amount-${id}" class="form-control mb-2" placeholder="Amount">
+                    <button id="earn-btn-${id}" class="btn btn-success">Save</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-danger-subtle mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Spend</h5>
+                    <input type="date" id="spend-date-${id}" class="form-control mb-2">
+                    <input type="text" id="spend-description-${id}" class="form-control mb-2" placeholder="Description">
+                    <input type="number" id="spend-amount-${id}" class="form-control mb-2" placeholder="Amount">
+                    <button id="spend-btn-${id}" class="btn btn-danger">Save</button>
+                </div>
+            </div>
+        </div>
+    `;
+    content.appendChild(earnSpendSection);
+
+    const graphHeader = document.createElement('h3');
+    graphHeader.textContent = 'Balance History';
+    content.appendChild(graphHeader);
+
+    const canvas = document.createElement('canvas');
+    content.appendChild(canvas);
+
+    const transactionHeader = document.createElement('h3');
+    transactionHeader.textContent = 'Transactions';
+    content.appendChild(transactionHeader);
+
+    const dateFilterSection = document.createElement('div');
+    dateFilterSection.className = 'row mb-3';
+    dateFilterSection.innerHTML = `
+        <div class="col-md-4">
+            <label for="month-select-${id}" class="form-label">Month</label>
+            <select id="month-select-${id}" class="form-select">
+                <option value="-1">All</option>
+                ${[...Array(12).keys()].map(i => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'long' })}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label for="year-select-${id}" class="form-label">Year</label>
+            <select id="year-select-${id}" class="form-select"></select>
+        </div>
+    `;
+    content.appendChild(dateFilterSection);
+
+    const startingBalanceEl = document.createElement('p');
+    content.appendChild(startingBalanceEl);
+
+    const transactionList = document.createElement('table');
+    transactionList.className = 'table table-striped';
+    transactionList.innerHTML = `
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    `;
+    content.appendChild(transactionList);
+    
+    contentContainer.appendChild(content);
+    accountBox.appendChild(contentContainer);
+
+    const monthSelect = content.querySelector(`#month-select-${id}`);
+    const yearSelect = content.querySelector(`#year-select-${id}`);
+
+    const years = [...new Set(account.transactions.filter(tx => !tx.deleted).map(tx => new Date(tx.date).getFullYear()))];
+    yearSelect.innerHTML = '<option value="-1">All</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+    const updateTransactions = () => {
+        const selectedMonth = parseInt(monthSelect.value, 10);
+        const selectedYear = parseInt(yearSelect.value, 10);
+
+        let filteredTransactions = account.transactions.filter(tx => !tx.deleted);
+
+        if (selectedYear !== -1) {
+            filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getFullYear() === selectedYear);
+        }
+        if (selectedMonth !== -1) {
+            filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getMonth() === selectedMonth);
+        }
+
+        const startingBalance = account.transactions
+            .filter(tx => !tx.deleted)
+            .filter(tx => {
+                const txDate = new Date(tx.date);
+                if (selectedYear === -1) return false;
+                if (selectedMonth === -1) {
+                    return txDate.getFullYear() < selectedYear;
+                }
+                return txDate < new Date(selectedYear, selectedMonth, 1);
+            })
+            .reduce((sum, tx) => sum + tx.amount, 0);
+
+        startingBalanceEl.textContent = `Starting Balance: ${startingBalance.toFixed(2)}`;
+
+        const transactionListBody = transactionList.querySelector('tbody');
+        transactionListBody.innerHTML = '';
+        filteredTransactions.forEach((tx) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${tx.date}</td>
+                <td>${tx.description}</td>
+                <td>${tx.amount.toFixed(2)}</td>
+                <td><button class="btn btn-sm btn-warning delete-transaction-btn" data-account-id="${id}" data-transaction-id="${tx.id}">Delete</button></td>
+            `;
+            transactionListBody.appendChild(row);
+        });
+        renderGraph(canvas, account, id, filteredTransactions);
+    };
+
+    monthSelect.addEventListener('change', updateTransactions);
+    yearSelect.addEventListener('change', updateTransactions);
+
+    content.querySelector(`#earn-date-${id}`).valueAsDate = new Date();
+    content.querySelector(`#spend-date-${id}`).valueAsDate = new Date();
+
+    content.querySelector(`#earn-btn-${id}`).addEventListener('click', () => {
+        const description = content.querySelector(`#earn-description-${id}`).value.trim();
+        const amount = parseFloat(content.querySelector(`#earn-amount-${id}`).value);
+        let date = content.querySelector(`#earn-date-${id}`).value;
+        if (!date) {
+            date = new Date().toISOString().split('T')[0];
+        }
+        if (!isNaN(amount)) {
+            accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount, timestamp: Date.now() });
+            content.querySelector(`#earn-description-${id}`).value = '';
+            content.querySelector(`#earn-amount-${id}`).value = '';
+            saveState();
+            renderAll(id);
+        }
+    });
+
+    content.querySelector(`#spend-btn-${id}`).addEventListener('click', () => {
+        const description = content.querySelector(`#spend-description-${id}`).value.trim();
+        const amount = parseFloat(content.querySelector(`#spend-amount-${id}`).value);
+        let date = content.querySelector(`#spend-date-${id}`).value;
+        if (!date) {
+            date = new Date().toISOString().split('T')[0];
+        }
+        if (!isNaN(amount)) {
+            accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount: -amount, timestamp: Date.now() });
+            content.querySelector(`#spend-description-${id}`).value = '';
+            content.querySelector(`#spend-amount-${id}`).value = '';
+            saveState();
+            renderAll(id);
+        }
+    });
+    updateTransactions();
+
+    return accountBox;
 }
 
 export function calculateGraphData(transactions, daysToDisplay = 30) {
