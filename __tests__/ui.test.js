@@ -1,12 +1,21 @@
-import { calculateGraphData } from '../ui.js';
+import { calculateGraphData, formatCurrency } from '../ui.js';
 
 // Mock dependencies to avoid loading full module with side effects
 jest.mock('../state.js', () => ({}));
 jest.mock('../s3.js', () => ({}));
 jest.mock('../encryption.js', () => ({}));
 
-describe('UI Module - Graph Data', () => {
-    test('calculateGraphData: correctly calculates running balance', () => {
+describe('UI Module', () => {
+    describe('formatCurrency', () => {
+        test('formats USD correctly', () => {
+            expect(formatCurrency(1234.56)).toMatch(/\$1,234.56/);
+            expect(formatCurrency(0)).toMatch(/\$0.00/);
+            expect(formatCurrency(-50)).toMatch(/-\$50.00/);
+        });
+    });
+
+    describe('Graph Data', () => {
+        test('calculateGraphData: correctly calculates running balance', () => {
         const today = new Date().toISOString().split('T')[0];
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
         
@@ -57,4 +66,5 @@ describe('UI Module - Graph Data', () => {
         // Ensure subsequent days maintain the balance
         expect(data[labels.length - 1]).toBe(200);
     });
+});
 });

@@ -64,6 +64,64 @@ export function showToast(message, type = 'info') {
     });
 }
 
+export function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}
+
+export function showModalAlert(message, title = 'Message') {
+    const modalEl = document.getElementById('generic-modal');
+    if (!modalEl) {
+        alert(message); // Fallback
+        return;
+    }
+    const modal = new bootstrap.Modal(modalEl);
+    document.getElementById('generic-modal-title').textContent = title;
+    document.getElementById('generic-modal-body').textContent = message;
+    
+    // Hide Cancel button, Show OK
+    document.getElementById('generic-modal-cancel').style.display = 'none';
+    const okBtn = document.getElementById('generic-modal-confirm');
+    okBtn.style.display = 'block';
+    
+    // Remove existing listeners to prevent stacking
+    const newOkBtn = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+    
+    newOkBtn.addEventListener('click', () => {
+        modal.hide();
+    });
+    
+    modal.show();
+}
+
+export function showModalConfirm(message, onConfirm, title = 'Confirm') {
+    const modalEl = document.getElementById('generic-modal');
+    if (!modalEl) {
+        if (confirm(message)) onConfirm(); // Fallback
+        return;
+    }
+    const modal = new bootstrap.Modal(modalEl);
+    document.getElementById('generic-modal-title').textContent = title;
+    document.getElementById('generic-modal-body').textContent = message;
+    
+    // Show Cancel and OK
+    const cancelBtn = document.getElementById('generic-modal-cancel');
+    const okBtn = document.getElementById('generic-modal-confirm');
+    cancelBtn.style.display = 'block';
+    okBtn.style.display = 'block';
+    
+    // Handle OK
+    const newOkBtn = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+    
+    newOkBtn.addEventListener('click', () => {
+        modal.hide();
+        if (onConfirm) onConfirm();
+    });
+    
+    modal.show();
+}
+
 export function updateSyncIcon(status) {
     const icon = document.getElementById('sync-status-icon');
     if (!icon) return;
@@ -145,7 +203,7 @@ export function initUI() {
         showKeysBtn.addEventListener('click', () => {
             if (keysDisplayContainer.style.display === 'none') {
                 if (!syncGuid || !encryptionKeyJwk) {
-                    alert('No sync keys found. Please generate keys first.');
+                    showModalAlert('No sync keys found. Please generate keys first.');
                     return;
                 }
                 keysDisplayContainer.innerHTML = `<strong>Sync ID:</strong> ${syncGuid}<br><br><strong>Encryption Key (JWK):</strong><br>${JSON.stringify(encryptionKeyJwk)}`;
@@ -168,10 +226,10 @@ export function initUI() {
     if (copyLogsBtn) {
         copyLogsBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(logsContainer.textContent).then(() => {
-                alert('Logs copied to clipboard!');
+                showModalAlert('Logs copied to clipboard!');
             }).catch(err => {
                 console.error('Failed to copy logs:', err);
-                alert('Failed to copy logs.');
+                showModalAlert('Failed to copy logs.', 'Error');
             });
         });
     }
@@ -283,10 +341,10 @@ export function initUI() {
                     setDeletedAccountIds(importedDeletedAccountIds); // Update deletedAccountIds
                     saveState();
                     renderAll();
-                    alert('Data imported successfully. Any previously deleted accounts in this file have been restored.');
+                    showModalAlert('Data imported successfully. Any previously deleted accounts in this file have been restored.', 'Success');
                 } catch (error) {
                     console.error(error);
-                    alert('Invalid JSON file.');
+                    showModalAlert('Invalid JSON file.', 'Error');
                 }
             };
             reader.readAsText(file);
@@ -310,7 +368,7 @@ export function initUI() {
             // PAR Mode
             const parUrl = awsParUrlInput.value.trim();
             if (!parUrl) {
-                 alert('Please enter a valid PAR URL.');
+                 showModalAlert('Please enter a valid PAR URL.', 'Error');
                  return;
             }
             config = { parUrl };
@@ -324,32 +382,31 @@ export function initUI() {
                 secretAccessKey: awsSecretKeyInput.value.trim()
             };
             if (!config.bucket || !config.region || !config.accessKeyId || !config.secretAccessKey) {
-                alert('Please fill in all AWS configuration fields (Endpoint is optional for AWS).');
+                showModalAlert('Please fill in all AWS configuration fields (Endpoint is optional for AWS).', 'Error');
                 return;
             }
         }
         
         setCloudConfig(config);
-        alert('Cloud configuration saved.');
+        showModalAlert('Cloud configuration saved.', 'Success');
         saveState(); // Trigger sync attempt
     });
 
     generateSyncKeysBtn.addEventListener('click', async () => {
-        if (!confirm('This will generate a new sync ID and encryption key. Any existing data in the cloud with the old ID will be lost to this device (unless you have a backup). Continue?')) {
-            return;
-        }
-        const guid = crypto.randomUUID();
-        const key = await generateKey();
-        const jwk = await exportKey(key);
-        setSyncDetails(guid, jwk);
-        alert('New Sync ID and Encryption Key generated. You can now sync.');
-        saveState();
+        showModalConfirm('This will generate a new sync ID and encryption key. Any existing data in the cloud with the old ID will be lost to this device (unless you have a backup). Continue?', async () => {
+            const guid = crypto.randomUUID();
+            const key = await generateKey();
+            const jwk = await exportKey(key);
+            setSyncDetails(guid, jwk);
+            showModalAlert('New Sync ID and Encryption Key generated. You can now sync.', 'Keys Generated');
+            saveState();
+        }, 'Generate New Keys');
     });
 
     showQrBtn.addEventListener('click', () => {
         const cloudConfig = getCloudConfig();
         if (!cloudConfig || !syncGuid || !encryptionKeyJwk) {
-            alert('Please configure Cloud Sync (AWS details + Generate Keys) first.');
+            showModalAlert('Please configure Cloud Sync (AWS details + Generate Keys) first.', 'Configuration Missing');
             return;
         }
 
@@ -414,7 +471,7 @@ export function initUI() {
 
     async function processImportedConfig(payload) {
         if (!payload.aws || !payload.guid || !payload.key) {
-            alert('Invalid configuration format. Missing aws config, guid, or encryption key.');
+            showModalAlert('Invalid configuration format. Missing aws config, guid, or encryption key.', 'Import Error');
             console.error('Import failed. Invalid payload structure:', payload);
             return;
         }
@@ -449,9 +506,9 @@ export function initUI() {
             if (data) {
                 replaceState(data);
                 renderAll();
-                alert('Configuration imported and data synced successfully!');
+                showModalAlert('Configuration imported and data synced successfully!', 'Success');
             } else {
-                alert('Configuration imported. No data found on cloud yet or download failed.');
+                showModalAlert('Configuration imported. No data found on cloud yet or download failed.', 'Warning');
             }
         }
     }
@@ -464,7 +521,7 @@ export function initUI() {
             await processImportedConfig(payload);
         } catch (e) {
             console.error(e);
-            alert('Failed to parse configuration. Ensure it is valid JSON.');
+            showModalAlert('Failed to parse configuration. Ensure it is valid JSON.', 'Error');
         }
     });
 
@@ -495,10 +552,10 @@ export function initUI() {
                         processImportedConfig(payload);
                     } catch (e) {
                         console.error("Scanned text is not valid JSON:", e);
-                        alert("Scanned QR code does not contain a valid configuration.");
+                        showModalAlert("Scanned QR code does not contain a valid configuration.", 'Scan Error');
                     }
                 } else {
-                    alert("Failed to detect a QR code in the image.");
+                    showModalAlert("Failed to detect a QR code in the image.", 'Scan Error');
                 }
             };
             img.src = e.target.result;
@@ -575,31 +632,6 @@ export function initUI() {
         stopScanning();
     });
 
-    importFileInput.addEventListener('change', () => {
-        const file = importFileInput.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    let importedData = JSON.parse(e.target.result);
-                    // Handle wrapped format vs legacy format
-                    if (importedData.accounts) {
-                        importedData = importedData.accounts;
-                    }
-                    
-                    // Revive accounts on explicit import
-                    setAccounts(importedData, true);
-                    saveState();
-                    renderAll();
-                    alert('Data imported successfully. Any previously deleted accounts in this file have been restored.');
-                } catch (error) {
-                    console.error(error);
-                    alert('Invalid JSON file.');
-                }
-            };
-            reader.readAsText(file);
-        }
-    });
 
     addAccountBtn.addEventListener('click', async () => {
         const name = accountNameInput.value.trim();
@@ -612,7 +644,7 @@ export function initUI() {
                     image = await resizeImage(imageFile);
                 } catch (e) {
                     console.error("Failed to resize image", e);
-                    alert("Failed to process image.");
+                    showModalAlert("Failed to process image.", 'Error');
                     return;
                 }
             }
@@ -628,11 +660,13 @@ export function initUI() {
 
     removeAccountLink.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentAccountId && confirm('Are you sure you want to remove this account?')) {
-            removeAccount(currentAccountId);
-            renderAll(currentAccountId);
+        accountContextMenu.hide(); // Hide context menu first
+        if (currentAccountId) {
+            showModalConfirm('Are you sure you want to remove this account?', () => {
+                removeAccount(currentAccountId);
+                renderAll(currentAccountId);
+            }, 'Remove Account');
         }
-        accountContextMenu.hide();
     });
 
     addEditImageLink.addEventListener('click', (e) => {
@@ -661,25 +695,27 @@ export function initUI() {
                 renderAll(currentAccountId);
             } catch (e) {
                 console.error("Failed to resize image", e);
-                alert("Failed to process image.");
+                showModalAlert("Failed to process image.", 'Error');
             }
         }
     });
 
     accountsContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('delete-transaction-btn')) {
-            const accountId = e.target.dataset.accountId;
-            const transactionId = e.target.dataset.transactionId; // Keep as string
+        const deleteBtn = e.target.closest('.delete-transaction-btn');
+        if (deleteBtn) {
+            const accountId = deleteBtn.dataset.accountId;
+            const transactionId = deleteBtn.dataset.transactionId;
             
-            // Compare as strings to handle both UUIDs and legacy numeric IDs
-            const transactionIndex = accounts[accountId].transactions.findIndex(tx => String(tx.id) === transactionId);
+            showModalConfirm('Are you sure you want to delete this transaction?', () => {
+                 const transactionIndex = accounts[accountId].transactions.findIndex(tx => String(tx.id) === transactionId);
             
-            if (transactionIndex > -1) {
-                accounts[accountId].transactions[transactionIndex].deleted = true;
-                accounts[accountId].transactions[transactionIndex].timestamp = Date.now();
-                saveState();
-                renderAll(accountId);
-            }
+                if (transactionIndex > -1) {
+                    accounts[accountId].transactions[transactionIndex].deleted = true;
+                    accounts[accountId].transactions[transactionIndex].timestamp = Date.now();
+                    saveState();
+                    renderAll(accountId);
+                }
+            }, 'Delete Transaction');
         }
     });
 
@@ -755,7 +791,7 @@ function createAccountElement(id, account) {
         imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-2" style="width: 30px; height: 30px;">`;
     }
     const balance = account.transactions.filter(tx => !tx.deleted).reduce((sum, tx) => sum + tx.amount, 0);
-    button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${balance.toFixed(2)}`;
+    button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${formatCurrency(balance)}`;
 
     button.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -816,24 +852,42 @@ function createAccountElement(id, account) {
     content.appendChild(transactionHeader);
 
     const dateFilterSection = document.createElement('div');
-    dateFilterSection.className = 'row mb-3';
+    dateFilterSection.className = 'row mb-3 align-items-end';
     dateFilterSection.innerHTML = `
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label for="month-select-${id}" class="form-label">Month</label>
             <select id="month-select-${id}" class="form-select">
                 <option value="-1">All</option>
                 ${[...Array(12).keys()].map(i => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'long' })}</option>`).join('')}
             </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label for="year-select-${id}" class="form-label">Year</label>
             <select id="year-select-${id}" class="form-select"></select>
+        </div>
+        <div class="col-md-3">
+             <label for="limit-select-${id}" class="form-label">Show</label>
+             <select id="limit-select-${id}" class="form-select">
+                <option value="20" selected>Last 20</option>
+                <option value="50">Last 50</option>
+                <option value="100">Last 100</option>
+                <option value="-1">All</option>
+             </select>
         </div>
     `;
     content.appendChild(dateFilterSection);
 
     const startingBalanceEl = document.createElement('p');
     content.appendChild(startingBalanceEl);
+
+    const emptyStateEl = document.createElement('div');
+    emptyStateEl.className = 'text-center p-4 text-muted bg-light rounded mb-3';
+    emptyStateEl.style.display = 'none';
+    emptyStateEl.innerHTML = `
+        <div style="font-size: 3rem;">🐷</div>
+        <p class="mt-2">No transactions yet. Add some pocket money to get started!</p>
+    `;
+    content.appendChild(emptyStateEl);
 
     const transactionList = document.createElement('table');
     transactionList.className = 'table table-striped';
@@ -855,6 +909,7 @@ function createAccountElement(id, account) {
 
     const monthSelect = content.querySelector(`#month-select-${id}`);
     const yearSelect = content.querySelector(`#year-select-${id}`);
+    const limitSelect = content.querySelector(`#limit-select-${id}`);
 
     const years = [...new Set(account.transactions.filter(tx => !tx.deleted).map(tx => new Date(tx.date).getFullYear()))];
     yearSelect.innerHTML = '<option value="-1">All</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
@@ -862,8 +917,12 @@ function createAccountElement(id, account) {
     const updateTransactions = () => {
         const selectedMonth = parseInt(monthSelect.value, 10);
         const selectedYear = parseInt(yearSelect.value, 10);
+        const limit = parseInt(limitSelect.value, 10);
 
         let filteredTransactions = account.transactions.filter(tx => !tx.deleted);
+
+        // Sort by date descending (latest first)
+        filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date) || b.timestamp - a.timestamp);
 
         if (selectedYear !== -1) {
             filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getFullYear() === selectedYear);
@@ -872,6 +931,13 @@ function createAccountElement(id, account) {
             filteredTransactions = filteredTransactions.filter(tx => new Date(tx.date).getMonth() === selectedMonth);
         }
 
+        // Calculate starting balance only if we are filtering by date (not just limit)
+        // If showing "Last 20", starting balance isn't as relevant or is harder to calc dynamically for the "window".
+        // Let's keep starting balance logic for Month/Year filters, but maybe hide it for "Last X" view if no date filter?
+        // Actually, simplest is to calculate total balance before the displayed set.
+        
+        // But wait, if we reverse sort (latest first), the "starting balance" concept is usually "balance at end of list".
+        
         const startingBalance = account.transactions
             .filter(tx => !tx.deleted)
             .filter(tx => {
@@ -884,25 +950,43 @@ function createAccountElement(id, account) {
             })
             .reduce((sum, tx) => sum + tx.amount, 0);
 
-        startingBalanceEl.textContent = `Starting Balance: ${startingBalance.toFixed(2)}`;
+        startingBalanceEl.textContent = `Starting Balance (for selected period): ${formatCurrency(startingBalance)}`;
+        
+        // Apply limit
+        const displayTransactions = limit === -1 ? filteredTransactions : filteredTransactions.slice(0, limit);
 
         const transactionListBody = transactionList.querySelector('tbody');
         transactionListBody.innerHTML = '';
-        filteredTransactions.forEach((tx) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${tx.date}</td>
-                <td>${tx.description}</td>
-                <td>${tx.amount.toFixed(2)}</td>
-                <td><button class="btn btn-sm btn-warning delete-transaction-btn" data-account-id="${id}" data-transaction-id="${tx.id}">Delete</button></td>
-            `;
-            transactionListBody.appendChild(row);
-        });
-        renderGraph(canvas, account, id, filteredTransactions);
+        
+        if (displayTransactions.length === 0) {
+            transactionList.style.display = 'none';
+            emptyStateEl.style.display = 'block';
+        } else {
+            transactionList.style.display = 'table';
+            emptyStateEl.style.display = 'none';
+            
+            displayTransactions.forEach((tx) => {
+                const row = document.createElement('tr');
+                const amountClass = tx.amount >= 0 ? 'text-success' : 'text-danger';
+                row.innerHTML = `
+                    <td>${tx.date}</td>
+                    <td>${tx.description}</td>
+                    <td class="${amountClass}"><strong>${formatCurrency(tx.amount)}</strong></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-warning delete-transaction-btn" data-account-id="${id}" data-transaction-id="${tx.id}">
+                            🗑️
+                        </button>
+                    </td>
+                `;
+                transactionListBody.appendChild(row);
+            });
+        }
+        renderGraph(canvas, account, id, filteredTransactions); // Graph uses all filtered, ignoring limit for better context
     };
 
     monthSelect.addEventListener('change', updateTransactions);
     yearSelect.addEventListener('change', updateTransactions);
+    limitSelect.addEventListener('change', updateTransactions);
 
     content.querySelector(`#earn-date-${id}`).valueAsDate = new Date();
     content.querySelector(`#spend-date-${id}`).valueAsDate = new Date();
