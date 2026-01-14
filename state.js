@@ -83,7 +83,7 @@ function normalizeTransactions(txs) {
  * Transactions are merged by ID. Metadata (names, images) prefers local.
  * Respects deleted accounts (tombstones), but allows Restoration via restoredAccountIds.
  */
-function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
+export function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
     const merged = { ...cloud };
     
     // Merge deleted IDs
