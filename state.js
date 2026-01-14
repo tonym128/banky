@@ -21,6 +21,7 @@ export function setToastConfig(config) {
 export let cloudSyncEnabled = JSON.parse(localStorage.getItem('cloudSyncEnabled')) || false;
 export let syncGuid = localStorage.getItem('syncGuid') || null;
 export let encryptionKeyJwk = JSON.parse(localStorage.getItem('encryptionKeyJwk')) || null;
+export let lastEtag = localStorage.getItem('lastEtag') || null;
 let cachedCryptoKey = null;
 let isSyncing = false;
 
@@ -58,6 +59,8 @@ export function setSyncDetails(guid, keyJwk) {
     encryptionKeyJwk = keyJwk;
     localStorage.setItem('syncGuid', guid);
     localStorage.setItem('encryptionKeyJwk', JSON.stringify(keyJwk));
+    localStorage.removeItem('lastEtag'); // Reset ETag on new credentials
+    lastEtag = null;
     cachedCryptoKey = null; // Clear cache
 }
 
@@ -219,12 +222,23 @@ export async function syncWithCloud() {
         if (toastConfig.enabled && toastConfig.showSyncStart) {
             PubSub.publish(EVENTS.TOAST_NOTIFICATION, { message: 'Syncing with cloud...', type: 'info' });
         }
-        const cloudDataPayload = await loadFromCloud();
+        
+        const syncResult = await loadFromCloud();
         
         let mergedResult;
         let cloudStateToCompare = null;
         
-        if (cloudDataPayload) {
+        if (syncResult && syncResult.notModified) {
+             console.log("Cloud data has not changed (ETag match).");
+             // Even if cloud hasn't changed, we might have local changes to upload
+             mergedResult = { accounts, deletedIds: deletedAccountIds };
+             // We can use current state as cloud state for comparison
+             cloudStateToCompare = { accounts, deletedIds: deletedAccountIds }; 
+        } else if (syncResult && syncResult.data) {
+            const cloudDataPayload = syncResult.data;
+            lastEtag = syncResult.etag;
+            localStorage.setItem('lastEtag', lastEtag);
+
             // Handle legacy format (just accounts object) vs new format (wrapper)
             let cloudAccounts = cloudDataPayload;
             let cloudDeletedIds = [];
@@ -234,8 +248,6 @@ export async function syncWithCloud() {
                 cloudDeletedIds = cloudDataPayload.deletedIds;
                 cloudStateToCompare = cloudDataPayload;
             } else {
-                // If legacy, we construct the object to compare against the new structure roughly
-                // But better to just compare accounts.
                 cloudStateToCompare = { accounts: cloudAccounts, deletedIds: [] };
             }
 
@@ -262,7 +274,11 @@ export async function syncWithCloud() {
             const key = await getCryptoKey();
             // Upload the new wrapper structure
             const encrypted = await encryptData(mergedResult, key);
-            await uploadToS3(encrypted, syncGuid);
+            const newEtag = await uploadToS3(encrypted, syncGuid);
+            if (newEtag) {
+                lastEtag = newEtag;
+                localStorage.setItem('lastEtag', lastEtag);
+            }
             console.log("Cloud sync completed successfully (Uploaded).");
             PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'synced');
             if (toastConfig.enabled && toastConfig.showSyncSuccess) {
@@ -298,11 +314,14 @@ export async function loadFromCloud() {
         return null;
     }
     try {
-        const encrypted = await downloadFromS3(syncGuid);
-        if (encrypted) {
+        const result = await downloadFromS3(syncGuid, lastEtag);
+        if (result && result.notModified) {
+            return { notModified: true };
+        }
+        if (result && result.data) {
             const key = await getCryptoKey();
-            const data = await decryptData(encrypted, key);
-            return data;
+            const data = await decryptData(result.data, key);
+            return { data, etag: result.etag, notModified: false };
         }
     } catch (error) {
         console.error("Failed to load from cloud:", error);
@@ -351,6 +370,8 @@ export function replaceState(cloudData) {
     localStorage.setItem('accounts', JSON.stringify(accounts));
     localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
     localStorage.removeItem('restoredAccountIds');
+    localStorage.removeItem('lastEtag'); // Invalidate ETag as we forced state
+    lastEtag = null;
 }
 
 export function saveState() {
@@ -367,4 +388,17 @@ window.addEventListener('online', () => {
 
 window.addEventListener('offline', () => {
     PubSub.publish(EVENTS.SYNC_STATUS_CHANGED, 'offline');
+});
+
+// Periodically check for updates when window is focused or visibility changes
+window.addEventListener('focus', () => {
+    if (cloudSyncEnabled) {
+        syncWithCloud();
+    }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && cloudSyncEnabled) {
+        syncWithCloud();
+    }
 });

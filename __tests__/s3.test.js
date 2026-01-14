@@ -14,9 +14,12 @@ describe('S3 Module', () => {
     test('uploadToS3: uses PAR when configured', async () => {
         setCloudConfig({ parUrl: 'https://fake-par.com/' });
         
-        global.fetch.mockResolvedValue({ ok: true });
+        global.fetch.mockResolvedValue({ 
+            ok: true,
+            headers: new Map([['ETag', 'new-etag-par']])
+        });
 
-        await uploadToS3('some-data', 'file.txt');
+        const etag = await uploadToS3('some-data', 'file.txt');
 
         expect(global.fetch).toHaveBeenCalledWith(
             'https://fake-par.com/file.txt',
@@ -25,6 +28,7 @@ describe('S3 Module', () => {
                 body: 'some-data'
             })
         );
+        expect(etag).toBe('new-etag-par');
         expect(S3Client).not.toHaveBeenCalled(); // Should not use S3 Client
     });
 
@@ -38,8 +42,9 @@ describe('S3 Module', () => {
 
         // The mock from __mocks__/esmSh.js returns an object with a send method
         const mockSend = S3Client.mock.results[0].value.send; 
+        mockSend.mockResolvedValue({ ETag: 'new-etag-s3' });
         
-        await uploadToS3('some-data', 'file.txt');
+        const etag = await uploadToS3('some-data', 'file.txt');
 
         expect(mockSend).toHaveBeenCalled();
         expect(PutObjectCommand).toHaveBeenCalledWith(expect.objectContaining({
@@ -47,19 +52,44 @@ describe('S3 Module', () => {
             Key: 'file.txt',
             Body: 'some-data'
         }));
+        expect(etag).toBe('new-etag-s3');
     });
 
     test('downloadFromS3: uses PAR when configured', async () => {
         setCloudConfig({ parUrl: 'https://fake-par.com/' });
         
         global.fetch.mockResolvedValue({ 
+            status: 200,
             ok: true,
-            text: () => Promise.resolve('cloud-data')
+            text: () => Promise.resolve('cloud-data'),
+            headers: new Map([['ETag', 'etag-123']])
         });
 
-        const data = await downloadFromS3('file.txt');
+        const result = await downloadFromS3('file.txt');
 
-        expect(global.fetch).toHaveBeenCalledWith('https://fake-par.com/file.txt');
-        expect(data).toBe('cloud-data');
+        expect(global.fetch).toHaveBeenCalledWith('https://fake-par.com/file.txt', expect.any(Object));
+        expect(result.data).toBe('cloud-data');
+        expect(result.etag).toBe('etag-123');
+        expect(result.notModified).toBe(false);
+    });
+
+    test('downloadFromS3: handles 304 Not Modified in PAR mode', async () => {
+        setCloudConfig({ parUrl: 'https://fake-par.com/' });
+        
+        global.fetch.mockResolvedValue({ 
+            status: 304,
+            ok: true
+        });
+
+        const result = await downloadFromS3('file.txt', 'old-etag');
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'https://fake-par.com/file.txt',
+            expect.objectContaining({
+                headers: { 'If-None-Match': 'old-etag' }
+            })
+        );
+        expect(result.notModified).toBe(true);
+        expect(result.etag).toBe('old-etag');
     });
 });

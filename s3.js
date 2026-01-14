@@ -54,7 +54,8 @@ export async function uploadToS3(data, filename) {
                 throw new Error(`PAR Upload failed: ${response.statusText}`);
             }
             console.log('Successfully uploaded via PAR');
-            return;
+            // Fetch the new ETag if available
+            return response.headers.get('ETag');
         } catch (error) {
             console.error('Error uploading via PAR:', error);
             throw error;
@@ -72,28 +73,40 @@ export async function uploadToS3(data, filename) {
     });
 
     try {
-        await s3Client.send(command);
+        const result = await s3Client.send(command);
         console.log('Successfully uploaded to S3');
+        return result.ETag;
     } catch (error) {
         console.error('Error uploading to S3:', error);
         throw error;
     }
 }
 
-export async function downloadFromS3(filename) {
+export async function downloadFromS3(filename, etag = null) {
     if (!cloudConfig) return null;
 
     // PAR Mode
     if (cloudConfig.parUrl) {
          try {
             const url = cloudConfig.parUrl + filename;
-            const response = await fetch(url);
+            const headers = {};
+            if (etag) {
+                headers['If-None-Match'] = etag;
+            }
+
+            const response = await fetch(url, { headers });
+            
+            if (response.status === 304) {
+                return { notModified: true, etag };
+            }
             if (response.status === 404) return null; // File not found yet
             if (!response.ok) {
                 throw new Error(`PAR Download failed: ${response.statusText}`);
             }
+            
             const str = await response.text();
-            return str;
+            const newEtag = response.headers.get('ETag');
+            return { data: str, etag: newEtag, notModified: false };
         } catch (error) {
             console.error('Error downloading via PAR:', error);
             throw error;
@@ -103,16 +116,27 @@ export async function downloadFromS3(filename) {
     // S3 Client Mode
     if (!s3Client) return null;
 
-    const command = new GetObjectCommand({
+    const input = {
         Bucket: cloudConfig.bucket,
         Key: filename
-    });
+    };
+    if (etag) {
+        input.IfNoneMatch = etag;
+    }
+
+    const command = new GetObjectCommand(input);
 
     try {
         const response = await s3Client.send(command);
         const str = await response.Body.transformToString();
-        return str;
+        return { data: str, etag: response.ETag, notModified: false };
     } catch (error) {
+        // AWS SDK throws an error for 304 Not Modified
+        if (error.name === '304' || error.$metadata?.httpStatusCode === 304) {
+            return { notModified: true, etag };
+        }
+        if (error.name === 'NoSuchKey') return null;
+        
         console.error('Error downloading from S3:', error);
         throw error;
     }

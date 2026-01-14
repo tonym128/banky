@@ -135,7 +135,11 @@ describe('State Module', () => {
         setSyncDetails('test-guid', { k: 'key' });
         
         // Mock download response
-        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        s3.downloadFromS3.mockResolvedValue({
+            data: 'encrypted-cloud-data',
+            etag: 'etag-123',
+            notModified: false
+        });
         encryption.decryptData.mockResolvedValue({
             accounts: {
                 'cloud-acc': { id: 'cloud-acc', name: 'Cloud', transactions: [] }
@@ -151,7 +155,7 @@ describe('State Module', () => {
         await syncWithCloud();
 
         // Check if download happened
-        expect(s3.downloadFromS3).toHaveBeenCalledWith('test-guid');
+        expect(s3.downloadFromS3).toHaveBeenCalledWith('test-guid', null);
         expect(encryption.decryptData).toHaveBeenCalled();
 
         // Check if merge happened (implicitly by checking final state)
@@ -170,6 +174,7 @@ describe('State Module', () => {
         // Setup initial local state
         setAccounts({ 'local-acc': { id: 'local-acc' } });
         localStorage.setItem('restoredAccountIds', JSON.stringify(['local-acc']));
+        localStorage.setItem('lastEtag', 'some-etag');
         
         const cloudData = {
             accounts: { 'cloud-acc': { id: 'cloud-acc' } },
@@ -182,6 +187,7 @@ describe('State Module', () => {
         expect(accounts['cloud-acc']).toBeDefined();
         expect(deletedAccountIds).toContain('deleted-acc');
         expect(localStorage.getItem('restoredAccountIds')).toBeNull();
+        expect(localStorage.getItem('lastEtag')).toBeNull();
     });
 
     test('syncWithCloud: skips upload if data is identical', async () => {
@@ -194,7 +200,11 @@ describe('State Module', () => {
         };
 
         // Mock download to return data identical to local
-        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        s3.downloadFromS3.mockResolvedValue({
+            data: 'encrypted-cloud-data',
+            etag: 'etag-identical',
+            notModified: false
+        });
         encryption.decryptData.mockResolvedValue(identicalData);
 
         // Set local state to match
@@ -216,7 +226,11 @@ describe('State Module', () => {
         setToastConfig({ enabled: true, showSyncStart: true, showSyncSuccess: true });
 
         // Mock download to force upload path (non-identical)
-        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        s3.downloadFromS3.mockResolvedValue({
+            data: 'encrypted-cloud-data',
+            etag: 'etag-new',
+            notModified: false
+        });
         encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
         setAccounts({ 'acc1': { id: 'acc1', transactions: [] } });
 
@@ -234,7 +248,11 @@ describe('State Module', () => {
         setToastConfig({ enabled: false });
 
         // Mock download
-        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        s3.downloadFromS3.mockResolvedValue({
+            data: 'encrypted-cloud-data',
+            etag: 'etag-new',
+            notModified: false
+        });
         encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
         setAccounts({ 'acc1': { id: 'acc1', transactions: [] } });
 
@@ -247,7 +265,11 @@ describe('State Module', () => {
         setCloudSyncEnabled(true);
         setSyncDetails('test-guid-icon', { k: 'key' });
         
-        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        s3.downloadFromS3.mockResolvedValue({
+            data: 'encrypted-cloud-data',
+            etag: 'etag-new',
+            notModified: false
+        });
         encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
         
         await syncWithCloud();
