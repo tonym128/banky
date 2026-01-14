@@ -62,6 +62,37 @@ export function showToast(message, type = 'info') {
     });
 }
 
+export function updateSyncIcon(status) {
+    const icon = document.getElementById('sync-status-icon');
+    if (!icon) return;
+
+    icon.classList.remove('spin');
+    
+    switch (status) {
+        case 'synced':
+            icon.textContent = '🟢';
+            icon.title = 'Synced';
+            break;
+        case 'syncing':
+            icon.textContent = '🔄';
+            icon.classList.add('spin');
+            icon.title = 'Syncing...';
+            break;
+        case 'offline':
+            icon.textContent = '🔴';
+            icon.title = 'Offline';
+            break;
+        case 'disabled':
+            icon.textContent = '⚪';
+            icon.title = 'Sync Disabled';
+            break;
+        case 'error':
+             icon.textContent = '⚠️';
+             icon.title = 'Sync Error';
+             break;
+    }
+}
+
 export function initUI() {
     const addAccountBtn = document.getElementById('add-account-btn');
     const accountNameInput = document.getElementById('account-name');

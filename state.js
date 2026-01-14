@@ -1,5 +1,5 @@
 // state.js
-import { renderAll, showToast } from './ui.js';
+import { renderAll, showToast, updateSyncIcon } from './ui.js';
 import { get, set } from './idb.js';
 import { uploadToS3, downloadFromS3, getCloudConfig } from './s3.js';
 import { encryptData, decryptData, importKey, generateKey, exportKey } from './encryption.js';
@@ -50,6 +50,7 @@ export function setDeletedAccountIds(newDeletedAccountIds) {
 export function setCloudSyncEnabled(enabled) {
     cloudSyncEnabled = enabled;
     localStorage.setItem('cloudSyncEnabled', JSON.stringify(enabled));
+    updateSyncIcon(enabled ? 'synced' : 'disabled'); // Assume synced if enabled until sync runs
 }
 
 export function setSyncDetails(guid, keyJwk) {
@@ -201,6 +202,7 @@ export async function syncWithCloud() {
     if (!cloudSyncEnabled || !syncGuid || !encryptionKeyJwk || isSyncing) return;
     
     isSyncing = true;
+    updateSyncIcon('syncing');
     try {
         console.log("Starting full cloud sync (Merge & Upload)...");
         if (toastConfig.enabled && toastConfig.showSyncStart) {
@@ -241,6 +243,7 @@ export async function syncWithCloud() {
         // Optimization: Check if merged state differs from cloud state before uploading
         if (cloudStateToCompare && deepEqual(mergedResult, cloudStateToCompare)) {
             console.log("Local state is identical to cloud state. Skipping upload.");
+            updateSyncIcon('synced');
             if (toastConfig.enabled && toastConfig.showSyncSuccess) {
                 showToast('Sync Complete (No changes)', 'success');
             }
@@ -250,6 +253,7 @@ export async function syncWithCloud() {
             const encrypted = await encryptData(mergedResult, key);
             await uploadToS3(encrypted, syncGuid);
             console.log("Cloud sync completed successfully (Uploaded).");
+            updateSyncIcon('synced');
             if (toastConfig.enabled && toastConfig.showSyncSuccess) {
                 showToast('Sync Complete', 'success');
             }
@@ -263,12 +267,14 @@ export async function syncWithCloud() {
 
     } catch (error) {
         console.error("Cloud sync failed:", error);
+        updateSyncIcon('error');
     } finally {
         isSyncing = false;
     }
 }
 
 export async function loadInitialFile() {
+    updateSyncIcon(cloudSyncEnabled ? 'synced' : 'disabled'); // Initial state
     // Try Cloud Sync first if enabled
     if (cloudSyncEnabled && getCloudConfig()) {
         await syncWithCloud();
@@ -289,6 +295,7 @@ export async function loadFromCloud() {
         }
     } catch (error) {
         console.error("Failed to load from cloud:", error);
+        throw error;
     }
     return null;
 }
@@ -343,5 +350,10 @@ export function saveState() {
 
 window.addEventListener('online', () => {
     console.log('Connection restored. Triggering sync...');
+    updateSyncIcon('syncing'); // Immediate feedback
     syncWithCloud();
+});
+
+window.addEventListener('offline', () => {
+    updateSyncIcon('offline');
 });

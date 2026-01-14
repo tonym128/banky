@@ -7,7 +7,8 @@ import * as encryption from '../encryption.js';
 // Mock dependencies
 jest.mock('../ui.js', () => ({
     renderAll: jest.fn(),
-    showToast: jest.fn()
+    showToast: jest.fn(),
+    updateSyncIcon: jest.fn()
 }));
 
 jest.mock('../s3.js', () => ({
@@ -229,5 +230,30 @@ describe('State Module', () => {
         await syncWithCloud();
 
         expect(ui.showToast).not.toHaveBeenCalled();
+    });
+
+    test('syncWithCloud: updates sync icon status', async () => {
+        setCloudSyncEnabled(true);
+        setSyncDetails('test-guid-icon', { k: 'key' });
+        
+        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
+        
+        await syncWithCloud();
+
+        expect(ui.updateSyncIcon).toHaveBeenCalledWith('syncing');
+        expect(ui.updateSyncIcon).toHaveBeenCalledWith('synced');
+    });
+
+    test('syncWithCloud: updates sync icon on error', async () => {
+        setCloudSyncEnabled(true);
+        setSyncDetails('test-guid-icon-error', { k: 'key' });
+        
+        s3.downloadFromS3.mockRejectedValue(new Error('Network error'));
+        
+        await syncWithCloud();
+
+        expect(ui.updateSyncIcon).toHaveBeenCalledWith('syncing');
+        expect(ui.updateSyncIcon).toHaveBeenCalledWith('error');
     });
 });
