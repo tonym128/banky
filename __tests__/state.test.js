@@ -1,4 +1,4 @@
-import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails, replaceState } from '../state.js';
+import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails, replaceState, setDeletedAccountIds } from '../state.js';
 import * as ui from '../ui.js';
 import * as s3 from '../s3.js';
 import * as idb from '../idb.js';
@@ -34,6 +34,7 @@ describe('State Module', () => {
         jest.clearAllMocks();
         // Reset internal state if possible or rely on setAccounts
         setAccounts({});
+        setDeletedAccountIds([]);
         
         // Setup encryption mock defaults
         encryption.importKey.mockResolvedValue('mock-crypto-key');
@@ -168,5 +169,29 @@ describe('State Module', () => {
         expect(accounts['cloud-acc']).toBeDefined();
         expect(deletedAccountIds).toContain('deleted-acc');
         expect(localStorage.getItem('restoredAccountIds')).toBeNull();
+    });
+
+    test('syncWithCloud: skips upload if data is identical', async () => {
+        setCloudSyncEnabled(true);
+        setSyncDetails('test-guid-opt', { k: 'key' });
+        
+        const identicalData = {
+            accounts: { 'acc1': { id: 'acc1', transactions: [] } },
+            deletedIds: []
+        };
+
+        // Mock download to return data identical to local
+        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        encryption.decryptData.mockResolvedValue(identicalData);
+
+        // Set local state to match
+        setAccounts(identicalData.accounts);
+
+        await syncWithCloud();
+
+        expect(s3.downloadFromS3).toHaveBeenCalled();
+        expect(encryption.decryptData).toHaveBeenCalled();
+        // Should NOT upload
+        expect(s3.uploadToS3).not.toHaveBeenCalled();
     });
 });

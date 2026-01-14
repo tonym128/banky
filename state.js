@@ -163,6 +163,32 @@ export function removeAccount(accountId) {
     }
 }
 
+function deepEqual(obj1, obj2) {
+    if (obj1 === obj2) return true;
+    if (typeof obj1 !== 'object' || obj1 === null || typeof obj2 !== 'object' || obj2 === null) return false;
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    if (keys1.length !== keys2.length) {
+        // console.log(`deepEqual false: key length mismatch ${keys1.length} vs ${keys2.length}`, keys1, keys2);
+        return false;
+    }
+
+    for (const key of keys1) {
+        if (!keys2.includes(key)) {
+            // console.log(`deepEqual false: key ${key} missing in obj2`);
+            return false;
+        }
+        if (!deepEqual(obj1[key], obj2[key])) {
+            // console.log(`deepEqual false: mismatch at key ${key}`, obj1[key], obj2[key]);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 export async function syncWithCloud() {
     if (!cloudSyncEnabled || !syncGuid || !encryptionKeyJwk || isSyncing) return;
     
@@ -172,6 +198,7 @@ export async function syncWithCloud() {
         const cloudDataPayload = await loadFromCloud();
         
         let mergedResult;
+        let cloudStateToCompare = null;
         
         if (cloudDataPayload) {
             // Handle legacy format (just accounts object) vs new format (wrapper)
@@ -181,6 +208,11 @@ export async function syncWithCloud() {
             if (cloudDataPayload.accounts && Array.isArray(cloudDataPayload.deletedIds)) {
                 cloudAccounts = cloudDataPayload.accounts;
                 cloudDeletedIds = cloudDataPayload.deletedIds;
+                cloudStateToCompare = cloudDataPayload;
+            } else {
+                // If legacy, we construct the object to compare against the new structure roughly
+                // But better to just compare accounts.
+                cloudStateToCompare = { accounts: cloudAccounts, deletedIds: [] };
             }
 
             mergedResult = mergeAccounts(accounts, cloudAccounts, deletedAccountIds, cloudDeletedIds);
@@ -195,18 +227,23 @@ export async function syncWithCloud() {
              mergedResult = { accounts, deletedIds: deletedAccountIds };
         }
 
-        const key = await getCryptoKey();
-        // Upload the new wrapper structure
-        const encrypted = await encryptData(mergedResult, key);
-        await uploadToS3(encrypted, syncGuid);
+        // Optimization: Check if merged state differs from cloud state before uploading
+        if (cloudStateToCompare && deepEqual(mergedResult, cloudStateToCompare)) {
+            console.log("Local state is identical to cloud state. Skipping upload.");
+        } else {
+            const key = await getCryptoKey();
+            // Upload the new wrapper structure
+            const encrypted = await encryptData(mergedResult, key);
+            await uploadToS3(encrypted, syncGuid);
+            console.log("Cloud sync completed successfully (Uploaded).");
+        }
         
-        // If upload successful, we can clear the restoration protection
+        // If upload successful (or skipped), we can clear the restoration protection
         if (restoredAccountIds.length > 0) {
             restoredAccountIds = [];
             localStorage.removeItem('restoredAccountIds');
         }
 
-        console.log("Cloud sync completed successfully.");
     } catch (error) {
         console.error("Cloud sync failed:", error);
     } finally {
