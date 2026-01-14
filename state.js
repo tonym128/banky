@@ -105,10 +105,11 @@ export function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
 
     for (const id in local) {
         if (!merged[id]) {
-            merged[id] = local[id];
+            // New account only in local
+            merged[id] = { ...local[id] };
             merged[id].transactions = normalizeTransactions(merged[id].transactions);
         } else {
-            // Merge transactions using LWW
+            // Account in both - Create a NEW object to avoid mutating the original cloud data
             const localTx = normalizeTransactions(local[id].transactions);
             const cloudTx = normalizeTransactions(merged[id].transactions);
             
@@ -127,20 +128,30 @@ export function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
                 }
             });
             
-            merged[id].transactions = Array.from(txMap.values())
-                .filter(tx => !tx.deleted)
-                .sort((a, b) => new Date(a.date) - new Date(b.date));
-            
-            // Prefer local for metadata if it exists
-            merged[id].name = local[id].name || merged[id].name;
+            // Create a new account object starting with cloud data
+            merged[id] = {
+                ...cloud[id],
+                transactions: Array.from(txMap.values())
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+            };
+
+            // Only update metadata if local has it
+            if (local[id].name) merged[id].name = local[id].name;
             if (local[id].image) merged[id].image = local[id].image;
         }
     }
 
-    // Also normalize any cloud accounts that aren't in local
+    // Also normalize any cloud accounts that aren't in local (and weren't already processed)
     for (const id in merged) {
-        if (merged[id]) {
-            merged[id].transactions = normalizeTransactions(merged[id].transactions);
+        if (merged[id] && !local[id]) {
+            // Create a new object if we need to modify it (normalize transactions)
+            const normalizedTxs = normalizeTransactions(merged[id].transactions);
+            if (normalizedTxs !== merged[id].transactions) {
+                merged[id] = {
+                    ...merged[id],
+                    transactions: normalizedTxs
+                };
+            }
         }
     }
 
