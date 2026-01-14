@@ -743,12 +743,9 @@ function renderAccounts() {
     }
 }
 
-function renderGraph(canvas, account, id, transactions) {
+export function calculateGraphData(transactions, daysToDisplay = 30) {
     const today = new Date();
-    const last30Days = new Date(today);
-    last30Days.setDate(today.getDate() - 30);
-
-    const transactionsToGraph = transactions || account.transactions.filter(tx => new Date(tx.date) >= last30Days);
+    const transactionsToGraph = [...transactions]; // Clone to sort safely
     transactionsToGraph.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     const labels = [];
@@ -761,9 +758,7 @@ function renderGraph(canvas, account, id, transactions) {
         dateMap.set(tx.date, runningBalance);
     });
 
-    const displayDays = transactions ? transactions.length : 30;
-
-    for (let i = 0; i < displayDays; i++) {
+    for (let i = 0; i < daysToDisplay; i++) {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
         const dateString = date.toISOString().split('T')[0];
@@ -773,7 +768,15 @@ function renderGraph(canvas, account, id, transactions) {
             data.unshift(dateMap.get(dateString));
         } else {
             let previousBalance = 0;
-            for (const [txDate, balance] of dateMap.entries()) {
+            // Find the most recent balance before this date
+            // Since we iterate backwards in time for display, checking the map directly is better
+            // Ideally, we need the balance as of that specific date.
+            
+            // Optimization: Iterate through sorted transactions to find balance at date
+            // Or simpler: Reuse the logic from original code which looked at dateMap keys
+            
+            // Re-implementing the original logic to be faithful:
+             for (const [txDate, balance] of dateMap.entries()) {
                 if (new Date(txDate) < date) {
                     previousBalance = balance;
                 }
@@ -781,6 +784,18 @@ function renderGraph(canvas, account, id, transactions) {
             data.unshift(previousBalance);
         }
     }
+    return { labels, data };
+}
+
+function renderGraph(canvas, account, id, transactions) {
+    const today = new Date();
+    const last30Days = new Date(today);
+    last30Days.setDate(today.getDate() - 30);
+
+    const txSource = transactions || account.transactions.filter(tx => new Date(tx.date) >= last30Days);
+    const displayDays = transactions ? transactions.length : 30; // Heuristic from original code
+
+    const { labels, data } = calculateGraphData(txSource, displayDays);
 
     if (charts[id]) {
         charts[id].destroy();

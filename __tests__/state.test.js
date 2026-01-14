@@ -1,7 +1,8 @@
-import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds } from '../state.js';
+import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails } from '../state.js';
 import * as ui from '../ui.js';
 import * as s3 from '../s3.js';
 import * as idb from '../idb.js';
+import * as encryption from '../encryption.js';
 
 // Mock dependencies
 jest.mock('../ui.js', () => ({
@@ -19,12 +20,25 @@ jest.mock('../idb.js', () => ({
     set: jest.fn()
 }));
 
+jest.mock('../encryption.js', () => ({
+    encryptData: jest.fn(),
+    decryptData: jest.fn(),
+    importKey: jest.fn(),
+    generateKey: jest.fn(),
+    exportKey: jest.fn()
+}));
+
 describe('State Module', () => {
     beforeEach(() => {
         localStorage.clear();
         jest.clearAllMocks();
         // Reset internal state if possible or rely on setAccounts
         setAccounts({});
+        
+        // Setup encryption mock defaults
+        encryption.importKey.mockResolvedValue('mock-crypto-key');
+        encryption.encryptData.mockResolvedValue('encrypted-data');
+        encryption.decryptData.mockResolvedValue({ accounts: {}, deletedIds: [] });
     });
 
     test('mergeAccounts: combines local and cloud accounts', () => {
@@ -99,5 +113,42 @@ describe('State Module', () => {
         
         expect(accounts['acc1']).toBeUndefined();
         expect(deletedAccountIds).toContain('acc1');
+    });
+
+    test('syncWithCloud: downloads, merges, and uploads', async () => {
+        // Setup Sync Config
+        setCloudSyncEnabled(true);
+        setSyncDetails('test-guid', { k: 'key' });
+        
+        // Mock download response
+        s3.downloadFromS3.mockResolvedValue('encrypted-cloud-data');
+        encryption.decryptData.mockResolvedValue({
+            accounts: {
+                'cloud-acc': { id: 'cloud-acc', name: 'Cloud', transactions: [] }
+            },
+            deletedIds: []
+        });
+
+        // Setup Local State
+        setAccounts({
+            'local-acc': { id: 'local-acc', name: 'Local', transactions: [] }
+        });
+
+        await syncWithCloud();
+
+        // Check if download happened
+        expect(s3.downloadFromS3).toHaveBeenCalledWith('test-guid');
+        expect(encryption.decryptData).toHaveBeenCalled();
+
+        // Check if merge happened (implicitly by checking final state)
+        expect(accounts['local-acc']).toBeDefined();
+        expect(accounts['cloud-acc']).toBeDefined();
+
+        // Check if render was called
+        expect(ui.renderAll).toHaveBeenCalled();
+
+        // Check if upload happened
+        expect(encryption.encryptData).toHaveBeenCalled();
+        expect(s3.uploadToS3).toHaveBeenCalledWith('encrypted-data', 'test-guid');
     });
 });
