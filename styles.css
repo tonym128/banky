@@ -1,15 +1,19 @@
 body {
-    background-color: #f8f9fa;
+    /* Bootstrap handles background in dark mode, but we can enforce transitions */
+    transition: background-color 0.3s, color 0.3s;
 }
 
 h1 {
-    color: #0056b3;
+    /* Use Bootstrap variable for primary color so it adapts or stays consistent */
+    color: var(--bs-primary);
 }
 
+/* Context Menu - Dark Mode Support */
 #account-context-menu .modal-content {
     border-radius: 0.5rem;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     border: none;
+    /* Background handled by Bootstrap modal classes */
 }
 
 #account-context-menu .modal-header {
@@ -25,10 +29,12 @@ h1 {
     padding: 0.5rem 1rem;
     border-radius: 0.25rem;
     transition: background-color 0.15s ease-in-out;
+    color: var(--bs-body-color); /* Adaptive text color */
+    text-decoration: none;
 }
 
 #account-context-menu .modal-body a:hover {
-    background-color: #f1f1f1;
+    background-color: var(--bs-tertiary-bg); /* Adaptive hover background */
     text-decoration: none;
 }
 
@@ -40,4 +46,64 @@ h1 {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Mobile Optimized Transaction List */
+@media (max-width: 767.98px) {
+    /* Hide the table header */
+    .table thead {
+        display: none;
+    }
+
+    /* Make rows look like cards */
+    .table tbody tr {
+        display: block;
+        background-color: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
+        position: relative; /* For absolute positioning of delete btn if needed */
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    /* Adjust cells */
+    .table tbody td {
+        display: block;
+        border: none;
+        padding: 0.1rem 0;
+        text-align: left;
+    }
+
+    /* Date styling */
+    .table tbody td:nth-child(1) {
+        font-size: 0.85rem;
+        color: var(--bs-secondary-color);
+        margin-bottom: 0.2rem;
+    }
+
+    /* Description styling */
+    .table tbody td:nth-child(2) {
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.2rem;
+    }
+
+    /* Amount styling */
+    .table tbody td:nth-child(3) {
+        font-size: 1.2rem;
+        /* positioning it nicely */
+        position: absolute;
+        top: 0.75rem;
+        right: 3rem; /* Space for delete button */
+        text-align: right;
+    }
+
+    /* Delete button cell */
+    .table tbody td:nth-child(4) {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        padding: 0;
+    }
 }
