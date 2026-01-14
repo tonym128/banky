@@ -1,6 +1,6 @@
 {
   "name": "banky",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Kids Bank is a secure, privacy-focused Progressive Web App (PWA) designed to help parents manage their children's bank accounts. It tracks transactions (earnings and spending), provides visual balance history, and supports secure cloud synchronization with client-side encryption.",
   "main": "app.js",
   "scripts": {

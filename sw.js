@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kids-bank-cache-v10';
+const CACHE_NAME = 'kids-bank-cache-v11';
 const urlsToCache = [
     '/',
     'index.html',
@@ -25,11 +25,11 @@ const urlsToCache = [
     'favicon-16x16.png',
     'favicon-32x32.png',
     'apple-touch-icon.png',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-    'https://cdn.jsdelivr.net/npm/chart.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'
+    'vendor/bootstrap.min.css',
+    'vendor/bootstrap.bundle.min.js',
+    'vendor/chart.js',
+    'vendor/qrcode.min.js',
+    'vendor/jsQR.min.js'
 ];
 
 self.addEventListener('install', event => {
