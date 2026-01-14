@@ -160,10 +160,12 @@ export function initUI() {
     PubSub.subscribe(EVENTS.TOAST_NOTIFICATION, (data) => showToast(data.message, data.type));
 
     const addAccountBtn = document.getElementById('add-account-btn');
+    const openAddAccountBtn = document.getElementById('open-add-account-btn');
     const accountNameInput = document.getElementById('account-name');
     const accountImageInput = document.getElementById('account-image');
     const importFileInput = document.getElementById('import-file');
     const exportDataBtn = document.getElementById('export-data-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
     const importDataBtn = document.getElementById('import-data-btn');
     const accountsContainer = document.getElementById('accounts-container');
     
@@ -322,6 +324,45 @@ export function initUI() {
         a.click();
         URL.revokeObjectURL(url);
     });
+
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => {
+            let csvContent = "Account ID,Account Name,Transaction ID,Date,Description,Amount,Timestamp\n";
+
+            for (const accountId in accounts) {
+                const account = accounts[accountId];
+                const accountName = account.name.replace(/"/g, '""'); // Escape quotes
+                
+                if (account.transactions.length === 0) {
+                     csvContent += `"${accountId}","${accountName}",,,,\n`;
+                     continue;
+                }
+
+                account.transactions.forEach(tx => {
+                    const description = tx.description ? tx.description.replace(/"/g, '""') : '';
+                    const row = [
+                        `"${accountId}"`,
+                        `"${accountName}"`,
+                        `"${tx.id}"`,
+                        `"${tx.date}"`,
+                        `"${description}"`,
+                        tx.amount,
+                        tx.timestamp || ''
+                    ].join(",");
+                    csvContent += row + "\n";
+                });
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "kids-bank-export.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
 
     importDataBtn.addEventListener('click', () => {
         importFileInput.click();
@@ -633,6 +674,13 @@ export function initUI() {
     });
 
 
+    if (openAddAccountBtn) {
+        openAddAccountBtn.addEventListener('click', () => {
+             const settingsModal = bootstrap.Modal.getInstance(document.getElementById('settings-modal'));
+             if (settingsModal) settingsModal.hide();
+        });
+    }
+
     addAccountBtn.addEventListener('click', async () => {
         const name = accountNameInput.value.trim();
         const imageFile = accountImageInput.files[0];
@@ -655,6 +703,9 @@ export function initUI() {
             accountImageInput.value = '';
             saveState();
             renderAll(id);
+
+            const addAccountModal = bootstrap.Modal.getInstance(document.getElementById('add-account-modal'));
+            if (addAccountModal) addAccountModal.hide();
         }
     });
 

@@ -55,9 +55,15 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="d-grid gap-2 mb-3">
+                            <button id="open-add-account-btn" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#add-account-modal">
+                                ➕ Add New Account
+                            </button>
+                        </div>
                         <div class="mb-3">
                             <h3>Data Management</h3>
-                            <button id="export-data-btn" class="btn btn-primary">Export Data</button>
+                            <button id="export-data-btn" class="btn btn-primary">Export Data (JSON)</button>
+                            <button id="export-csv-btn" class="btn btn-info text-white">Export CSV</button>
                             <button id="import-data-btn" class="btn btn-secondary">Import Data</button>
                             <input type="file" id="import-file" accept=".json" style="display: none;">
                         </div>
@@ -123,21 +129,38 @@
                                 <div id="qr-code-container" class="mt-2"></div>
                                 <textarea id="import-config-text" class="form-control mt-2" placeholder="Paste Config JSON here to import" rows="3"></textarea>
                                 <button id="import-config-btn" class="btn btn-warning btn-sm mt-2">Import Config</button>
-                                <hr>
-                                <button id="show-logs-btn" class="btn btn-secondary btn-sm w-100">Show Logs</button>
                             </div>
-                        </div>
-                        <div class="mb-3">
-                            <h3>Add Account</h3>
-                            <input type="text" id="account-name" class="form-control mb-2" placeholder="New account name">
-                            <label for="account-image" class="form-label">Avatar:</label>
-                            <input type="file" id="account-image" class="form-control" accept="image/*">
-                            <button id="add-account-btn" class="btn btn-success mt-2">Add Account</button>
                         </div>
                         <div class="mb-3" id="pwa-install-section" style="display: none;">
                             <h3>PWA</h3>
                             <button id="install-pwa-btn" class="btn btn-primary">Install App</button>
                         </div>
+                        <hr>
+                        <button id="show-logs-btn" class="btn btn-secondary w-100">Show Application Logs</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Account Modal -->
+        <div class="modal fade" id="add-account-modal" tabindex="-1" aria-labelledby="addAccountModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addAccountModalLabel">Add Account</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="account-name" class="form-label">Account Name</label>
+                            <input type="text" id="account-name" class="form-control mb-2" placeholder="New account name">
+                            <label for="account-image" class="form-label">Avatar:</label>
+                            <input type="file" id="account-image" class="form-control" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                         <button id="add-account-btn" class="btn btn-success">Create Account</button>
                     </div>
                 </div>
             </div>
