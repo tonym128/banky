@@ -1,4 +1,4 @@
-import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails } from '../state.js';
+import { mergeAccounts, setAccounts, removeAccount, accounts, deletedAccountIds, syncWithCloud, setCloudSyncEnabled, setSyncDetails, replaceState } from '../state.js';
 import * as ui from '../ui.js';
 import * as s3 from '../s3.js';
 import * as idb from '../idb.js';
@@ -150,5 +150,23 @@ describe('State Module', () => {
         // Check if upload happened
         expect(encryption.encryptData).toHaveBeenCalled();
         expect(s3.uploadToS3).toHaveBeenCalledWith('encrypted-data', 'test-guid');
+    });
+
+    test('replaceState: completely overwrites local state with cloud data', () => {
+        // Setup initial local state
+        setAccounts({ 'local-acc': { id: 'local-acc' } });
+        localStorage.setItem('restoredAccountIds', JSON.stringify(['local-acc']));
+        
+        const cloudData = {
+            accounts: { 'cloud-acc': { id: 'cloud-acc' } },
+            deletedIds: ['deleted-acc']
+        };
+
+        replaceState(cloudData);
+
+        expect(accounts['local-acc']).toBeUndefined();
+        expect(accounts['cloud-acc']).toBeDefined();
+        expect(deletedAccountIds).toContain('deleted-acc');
+        expect(localStorage.getItem('restoredAccountIds')).toBeNull();
     });
 });

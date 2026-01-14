@@ -256,6 +256,31 @@ export const autoExport = debounce(async () => {
 
 }, 2000);
 
+export function replaceState(cloudData) {
+    if (!cloudData) return;
+
+    let newAccounts = cloudData;
+    let newDeletedIds = [];
+
+    // Handle wrapper format
+    if (cloudData.accounts && Array.isArray(cloudData.deletedIds)) {
+        newAccounts = cloudData.accounts;
+        newDeletedIds = cloudData.deletedIds;
+    } else if (cloudData.accounts) {
+        // Handle potential partial wrapper or legacy wrapper where deletedIds might be missing
+        newAccounts = cloudData.accounts;
+    }
+
+    accounts = newAccounts;
+    deletedAccountIds = newDeletedIds;
+    // Reset restoration protection as we are adopting a authoritative state
+    restoredAccountIds = [];
+    
+    localStorage.setItem('accounts', JSON.stringify(accounts));
+    localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
+    localStorage.removeItem('restoredAccountIds');
+}
+
 export function saveState() {
     localStorage.setItem('accounts', JSON.stringify(accounts));
     localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));

@@ -1,5 +1,5 @@
 // ui.js
-import { accounts, saveState, setAccounts, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
+import { accounts, saveState, setAccounts, replaceState, deletedAccountIds, setDeletedAccountIds, cloudSyncEnabled, setCloudSyncEnabled, setSyncDetails, syncGuid, encryptionKeyJwk, loadFromCloud, removeAccount } from './state.js';
 import { setCloudConfig, getCloudConfig, initS3Client } from './s3.js';
 import { generateKey, exportKey } from './encryption.js';
 
@@ -277,8 +277,7 @@ export function initUI() {
             initS3Client();
             const data = await loadFromCloud();
             if (data) {
-                setAccounts(data);
-                saveState();
+                replaceState(data);
                 renderAll();
                 alert('Configuration imported and data synced successfully!');
             } else {
