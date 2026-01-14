@@ -126,6 +126,8 @@ export function initUI() {
 
     const saveCloudConfigBtn = document.getElementById('save-cloud-config-btn');
     const generateSyncKeysBtn = document.getElementById('generate-sync-keys-btn');
+    const showKeysBtn = document.getElementById('show-keys-btn');
+    const keysDisplayContainer = document.getElementById('keys-display-container');
     const showQrBtn = document.getElementById('show-qr-btn');
     const scanQrBtn = document.getElementById('scan-qr-btn');
     const scanQrFileBtn = document.getElementById('scan-qr-file-btn');
@@ -138,6 +140,23 @@ export function initUI() {
     const logsContainer = document.getElementById('logs-container');
     const copyLogsBtn = document.getElementById('copy-logs-btn');
     const qrScannerModal = new bootstrap.Modal(document.getElementById('qr-scanner-modal'));
+
+    if (showKeysBtn && keysDisplayContainer) {
+        showKeysBtn.addEventListener('click', () => {
+            if (keysDisplayContainer.style.display === 'none') {
+                if (!syncGuid || !encryptionKeyJwk) {
+                    alert('No sync keys found. Please generate keys first.');
+                    return;
+                }
+                keysDisplayContainer.innerHTML = `<strong>Sync ID:</strong> ${syncGuid}<br><br><strong>Encryption Key (JWK):</strong><br>${JSON.stringify(encryptionKeyJwk)}`;
+                keysDisplayContainer.style.display = 'block';
+                showKeysBtn.textContent = 'Hide Secrets';
+            } else {
+                keysDisplayContainer.style.display = 'none';
+                showKeysBtn.textContent = 'Show Secrets';
+            }
+        });
+    }
 
     if (showLogsBtn) {
         showLogsBtn.addEventListener('click', () => {
