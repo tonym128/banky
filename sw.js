@@ -1,10 +1,16 @@
-const CACHE_NAME = 'kids-bank-cache-v8';
+const CACHE_NAME = 'kids-bank-cache-v9';
 const urlsToCache = [
     '/',
     'index.html',
     'styles.css',
     'app.js',
     'ui.js',
+    'ui-account.js',
+    'ui-settings.js',
+    'ui-components.js',
+    'pubsub.js',
+    'logger.js',
+    'utils.js',
     'pwa.js',
     'state.js',
     'idb.js',
@@ -15,6 +21,10 @@ const urlsToCache = [
     'images/logo.svg',
     'android-chrome-192x192.png',
     'android-chrome-512x512.png',
+    'favicon.ico',
+    'favicon-16x16.png',
+    'favicon-32x32.png',
+    'apple-touch-icon.png',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
     'https://cdn.jsdelivr.net/npm/chart.js',
