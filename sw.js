@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kids-bank-cache-v11';
+const CACHE_NAME = 'kids-bank-cache-v12';
 const urlsToCache = [
     '/',
     'index.html',
@@ -6,6 +6,9 @@ const urlsToCache = [
     'app.js',
     'ui.js',
     'ui-account.js',
+    'ui-transactions.js',
+    'ui-goals.js',
+    'ui-charts.js',
     'ui-settings.js',
     'ui-components.js',
     'pubsub.js',

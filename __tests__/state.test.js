@@ -195,7 +195,7 @@ describe('State Module', () => {
         setSyncDetails('test-guid-opt', { k: 'key' });
         
         const identicalData = {
-            accounts: { 'acc1': { id: 'acc1', transactions: [] } },
+            accounts: { 'acc1': { id: 'acc1', transactions: [], goals: [] } },
             deletedIds: []
         };
 

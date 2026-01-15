@@ -1,7 +1,8 @@
 // ui.js
 import { initLogger } from './logger.js';
 import { initSettingsUI } from './ui-settings.js';
-import { initAccountUI, renderAll, calculateGraphData } from './ui-account.js';
+import { initAccountUI, renderAll } from './ui-account.js';
+import { calculateGraphData } from './ui-charts.js';
 import { updateSyncIcon, showToast, formatCurrency, showModalAlert, showModalConfirm } from './ui-components.js';
 import { PubSub, EVENTS } from './pubsub.js';
 
