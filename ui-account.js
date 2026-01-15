@@ -6,6 +6,24 @@ import { resizeImage } from './utils.js';
 let charts = {};
 let currentAccountId = null;
 
+const EARN_CATEGORIES = {
+    'allowance': { label: 'Allowance', icon: '💸' },
+    'chores': { label: 'Chores', icon: '🧹' },
+    'gift': { label: 'Gift', icon: '🎁' },
+    'sell': { label: 'Sold Item', icon: '🏷️' },
+    'interest': { label: 'Interest', icon: '📈' },
+    'other': { label: 'Other', icon: '💰' }
+};
+
+const SPEND_CATEGORIES = {
+    'food': { label: 'Food/Treats', icon: '🍔' },
+    'toys': { label: 'Toys', icon: '🧸' },
+    'fun': { label: 'Entertainment', icon: '🎬' },
+    'clothing': { label: 'Clothing', icon: '👕' },
+    'electronics': { label: 'Electronics', icon: '🎮' },
+    'other': { label: 'Other', icon: '💸' }
+};
+
 export function initAccountUI() {
     const addAccountBtn = document.getElementById('add-account-btn');
     const accountNameInput = document.getElementById('account-name');
@@ -47,7 +65,7 @@ export function initAccountUI() {
 
     removeAccountLink.addEventListener('click', (e) => {
         e.preventDefault();
-        accountContextMenu.hide(); // Hide context menu first
+        accountContextMenu.hide();
         if (currentAccountId) {
             showModalConfirm('Are you sure you want to remove this account?', () => {
                 removeAccount(currentAccountId);
@@ -149,14 +167,79 @@ export function renderAll(accountId = null) {
 function renderAccounts() {
     const accountsContainer = document.getElementById('accounts-container');
     accountsContainer.innerHTML = '';
-    for (const id in accounts) {
+    
+    const accountIds = Object.keys(accounts);
+    
+    if (accountIds.length === 0) {
+        const emptyState = document.createElement('div');
+        emptyState.className = 'text-center py-5 px-4 bg-light-subtle rounded-4 border border-dashed mt-4';
+        emptyState.innerHTML = `
+            <div class="mb-4" style="font-size: 5rem;">🏦</div>
+            <h2 class="mb-3">Welcome to Kids Bank!</h2>
+            <p class="lead mb-4 text-muted">Ready to help your kids learn about money? Let's start by creating their first digital bank account.</p>
+            <button class="btn btn-primary btn-lg px-5 shadow-sm rounded-pill" data-bs-toggle="modal" data-bs-target="#add-account-modal">
+                ✨ Create First Account
+            </button>
+        `;
+        accountsContainer.appendChild(emptyState);
+        return;
+    }
+
+    for (const id of accountIds) {
         accountsContainer.appendChild(createAccountElement(id, accounts[id]));
     }
 }
 
+function renderTransactionForm(type, accountId) {
+    const isEarn = type === 'earn';
+    const categories = isEarn ? EARN_CATEGORIES : SPEND_CATEGORIES;
+    const btnClass = isEarn ? 'btn-success' : 'btn-danger';
+    const bgClass = isEarn ? 'bg-success-subtle' : 'bg-danger-subtle';
+    const title = isEarn ? 'Earn' : 'Spend';
+    
+    const categoryOptions = Object.entries(categories)
+        .map(([val, data]) => `<option value="${val}">${data.icon} ${data.label}</option>`)
+        .join('');
+
+    return `
+        <div class="card ${bgClass} mb-3 border-0 h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-3">${title}</h5>
+                <div class="row g-2">
+                    <div class="col-12">
+                         <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">📅</span>
+                            <input type="date" id="${type}-date-${accountId}" class="form-control border-start-0 ps-0">
+                        </div>
+                    </div>
+                    <div class="col-7">
+                        <select id="${type}-category-${accountId}" class="form-select">
+                            ${categoryOptions}
+                        </select>
+                    </div>
+                    <div class="col-5">
+                         <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">$</span>
+                            <input type="number" id="${type}-amount-${accountId}" class="form-control border-start-0 ps-0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <input type="text" id="${type}-description-${accountId}" class="form-control" placeholder="Description (Optional)">
+                    </div>
+                    <div class="col-12 mt-3">
+                        <button id="${type}-btn-${accountId}" class="btn ${btnClass} w-100 fw-bold rounded-pill">
+                            ${isEarn ? '➕ Add Money' : '➖ Spend Money'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 function createAccountElement(id, account) {
     const accountBox = document.createElement('div');
-    accountBox.className = 'accordion-item';
+    accountBox.className = 'accordion-item border-0 mb-3 shadow-sm rounded-3 overflow-hidden';
     accountBox.dataset.accountId = id;
 
     const header = document.createElement('h2');
@@ -164,7 +247,7 @@ function createAccountElement(id, account) {
     header.id = `heading-${id}`;
 
     const button = document.createElement('button');
-    button.className = 'accordion-button collapsed';
+    button.className = 'accordion-button collapsed bg-white';
     button.type = 'button';
     button.dataset.bsToggle = 'collapse';
     button.dataset.bsTarget = `#collapse-${id}`;
@@ -173,10 +256,24 @@ function createAccountElement(id, account) {
 
     let imageHtml = '';
     if (account.image) {
-        imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-2" style="width: 30px; height: 30px;">`;
+        imageHtml = `<img src="${account.image}" class="account-summary-image rounded-circle me-3 object-fit-cover" style="width: 40px; height: 40px;">`;
+    } else {
+         imageHtml = `<div class="rounded-circle bg-primary-subtle me-3 d-flex align-items-center justify-content-center text-primary fw-bold" style="width: 40px; height: 40px; font-size: 1.2rem;">${account.name.charAt(0).toUpperCase()}</div>`;
     }
+    
     const balance = account.transactions.filter(tx => !tx.deleted).reduce((sum, tx) => sum + tx.amount, 0);
-    button.innerHTML = `${imageHtml}<strong>${account.name}</strong>&nbsp;- Balance: ${formatCurrency(balance)}`;
+    button.innerHTML = `
+        <div class="d-flex align-items-center w-100">
+            ${imageHtml}
+            <div class="flex-grow-1">
+                <div class="fw-bold text-dark fs-5">${account.name}</div>
+                <div class="text-secondary small">Current Balance</div>
+            </div>
+            <div class="text-end me-3">
+                <div class="fw-bold fs-4 text-primary">${formatCurrency(balance)}</div>
+            </div>
+        </div>
+    `;
 
     button.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -195,109 +292,102 @@ function createAccountElement(id, account) {
     contentContainer.dataset.bsParent = '#accounts-container';
 
     const content = document.createElement('div');
-    content.className = 'accordion-body';
+    content.className = 'accordion-body bg-light-subtle';
 
+    // Actions Section
     const earnSpendSection = document.createElement('div');
-    earnSpendSection.className = 'row';
+    earnSpendSection.className = 'row mb-4';
     earnSpendSection.innerHTML = `
-        <div class="col-md-6">
-            <div class="card bg-success-subtle mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Earn</h5>
-                    <input type="date" id="earn-date-${id}" class="form-control mb-2">
-                    <input type="text" id="earn-description-${id}" class="form-control mb-2" placeholder="Description">
-                    <input type="number" id="earn-amount-${id}" class="form-control mb-2" placeholder="Amount">
-                    <button id="earn-btn-${id}" class="btn btn-success">Save</button>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card bg-danger-subtle mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">Spend</h5>
-                    <input type="date" id="spend-date-${id}" class="form-control mb-2">
-                    <input type="text" id="spend-description-${id}" class="form-control mb-2" placeholder="Description">
-                    <input type="number" id="spend-amount-${id}" class="form-control mb-2" placeholder="Amount">
-                    <button id="spend-btn-${id}" class="btn btn-danger">Save</button>
-                </div>
-            </div>
-        </div>
+        <div class="col-md-6 mb-3 mb-md-0">${renderTransactionForm('earn', id)}</div>
+        <div class="col-md-6">${renderTransactionForm('spend', id)}</div>
     `;
     content.appendChild(earnSpendSection);
 
-    const graphHeader = document.createElement('h3');
-    graphHeader.textContent = 'Balance History';
-    content.appendChild(graphHeader);
+    // Graph Section
+    const graphCard = document.createElement('div');
+    graphCard.className = 'card border-0 shadow-sm mb-4';
+    graphCard.innerHTML = `
+        <div class="card-body">
+             <h6 class="card-subtitle mb-3 text-muted text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Balance History</h6>
+             <canvas></canvas>
+        </div>
+    `;
+    content.appendChild(graphCard);
+    const canvas = graphCard.querySelector('canvas');
 
-    const canvas = document.createElement('canvas');
-    content.appendChild(canvas);
+    // Transactions Section
+    const transactionsHeader = document.createElement('div');
+    transactionsHeader.className = 'd-flex justify-content-between align-items-center mb-3 mt-4';
+    transactionsHeader.innerHTML = `<h3 class="h5 fw-bold mb-0">Recent Activity</h3>`;
+    content.appendChild(transactionsHeader);
 
-    const transactionHeader = document.createElement('h3');
-    transactionHeader.textContent = 'Transactions';
-    content.appendChild(transactionHeader);
-
+    // Filters
     const dateFilterSection = document.createElement('div');
-    dateFilterSection.className = 'row mb-3 align-items-end';
+    dateFilterSection.className = 'row g-2 mb-3';
     dateFilterSection.innerHTML = `
-        <div class="col-md-3">
-            <label for="month-select-${id}" class="form-label">Month</label>
-            <select id="month-select-${id}" class="form-select">
-                <option value="-1">All</option>
-                ${[...Array(12).keys()].map(i => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'long' })}</option>`).join('')}
+        <div class="col-4 col-md-3">
+            <select id="month-select-${id}" class="form-select form-select-sm border-0 shadow-sm">
+                <option value="-1">All Months</option>
+                ${[...Array(12).keys()].map(i => `<option value="${i}">${new Date(0, i).toLocaleString('default', { month: 'short' })}</option>`).join('')}
             </select>
         </div>
-        <div class="col-md-3">
-            <label for="year-select-${id}" class="form-label">Year</label>
-            <select id="year-select-${id}" class="form-select"></select>
+        <div class="col-4 col-md-3">
+            <select id="year-select-${id}" class="form-select form-select-sm border-0 shadow-sm"></select>
         </div>
-        <div class="col-md-3">
-             <label for="limit-select-${id}" class="form-label">Show</label>
-             <select id="limit-select-${id}" class="form-select">
+        <div class="col-4 col-md-3">
+             <select id="limit-select-${id}" class="form-select form-select-sm border-0 shadow-sm">
                 <option value="20" selected>Last 20</option>
                 <option value="50">Last 50</option>
-                <option value="100">Last 100</option>
-                <option value="-1">All</option>
+                <option value="-1">Show All</option>
              </select>
         </div>
     `;
     content.appendChild(dateFilterSection);
 
+    // Summary
     const startingBalanceEl = document.createElement('p');
+    startingBalanceEl.className = 'small text-muted mb-3 fst-italic';
     content.appendChild(startingBalanceEl);
 
+    // Empty State
     const emptyStateEl = document.createElement('div');
-    emptyStateEl.className = 'text-center p-4 text-muted bg-light rounded mb-3';
+    emptyStateEl.className = 'text-center py-4 px-3 text-muted bg-white rounded-4 border border-dashed mb-3';
     emptyStateEl.style.display = 'none';
     emptyStateEl.innerHTML = `
-        <div style="font-size: 3rem;">🐷</div>
-        <p class="mt-2">No transactions yet. Add some pocket money to get started!</p>
+        <div class="mb-2" style="font-size: 3.5rem;">🐷</div>
+        <p class="mb-0 fw-semibold">No transactions yet.</p>
+        <p class="small text-muted">Add some pocket money above to get started!</p>
     `;
     content.appendChild(emptyStateEl);
 
-    const transactionList = document.createElement('table');
-    transactionList.className = 'table table-striped';
-    transactionList.innerHTML = `
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    `;
-    content.appendChild(transactionList);
+    // Transaction List Container (Div based)
+    const transactionListContainer = document.createElement('div');
+    transactionListContainer.className = 'transaction-list-container';
+    content.appendChild(transactionListContainer);
     
     contentContainer.appendChild(content);
     accountBox.appendChild(contentContainer);
 
+    // Logic Binding
     const monthSelect = content.querySelector(`#month-select-${id}`);
     const yearSelect = content.querySelector(`#year-select-${id}`);
     const limitSelect = content.querySelector(`#limit-select-${id}`);
 
     const years = [...new Set(account.transactions.filter(tx => !tx.deleted).map(tx => new Date(tx.date).getFullYear()))];
-    yearSelect.innerHTML = '<option value="-1">All</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+    yearSelect.innerHTML = '<option value="-1">All Years</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+    
+    // Default to current year if available, else All
+    const currentYear = new Date().getFullYear();
+    if (years.includes(currentYear)) {
+        yearSelect.value = currentYear;
+    } else {
+        yearSelect.value = "-1";
+    }
+
+    // Default to current month if viewing current year
+    if (yearSelect.value == currentYear) {
+         monthSelect.value = new Date().getMonth();
+    }
 
     const updateTransactions = () => {
         const selectedMonth = parseInt(monthSelect.value, 10);
@@ -306,7 +396,7 @@ function createAccountElement(id, account) {
 
         let filteredTransactions = account.transactions.filter(tx => !tx.deleted);
 
-        // Sort by date descending (latest first)
+        // Sort by date descending
         filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date) || b.timestamp - a.timestamp);
 
         if (selectedYear !== -1) {
@@ -328,81 +418,186 @@ function createAccountElement(id, account) {
             })
             .reduce((sum, tx) => sum + tx.amount, 0);
 
-        startingBalanceEl.textContent = `Starting Balance (for selected period): ${formatCurrency(startingBalance)}`;
+        if (selectedYear !== -1 || selectedMonth !== -1) {
+            startingBalanceEl.textContent = `Starting Balance (for selected period): ${formatCurrency(startingBalance)}`;
+            startingBalanceEl.style.display = 'block';
+        } else {
+            startingBalanceEl.style.display = 'none';
+        }
         
-        // Apply limit
         const displayTransactions = limit === -1 ? filteredTransactions : filteredTransactions.slice(0, limit);
 
-        const transactionListBody = transactionList.querySelector('tbody');
-        transactionListBody.innerHTML = '';
-        
-        if (displayTransactions.length === 0) {
-            transactionList.style.display = 'none';
-            emptyStateEl.style.display = 'block';
-        } else {
-            transactionList.style.display = 'table';
-            emptyStateEl.style.display = 'none';
-            
-            displayTransactions.forEach((tx) => {
-                const row = document.createElement('tr');
-                const amountClass = tx.amount >= 0 ? 'text-success' : 'text-danger';
-                row.innerHTML = `
-                    <td>${tx.date}</td>
-                    <td>${tx.description}</td>
-                    <td class="${amountClass}"><strong>${formatCurrency(tx.amount)}</strong></td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-warning delete-transaction-btn" data-account-id="${id}" data-transaction-id="${tx.id}">
-                            🗑️
-                        </button>
-                    </td>
-                `;
-                transactionListBody.appendChild(row);
-            });
-        }
-        renderGraph(canvas, account, id, filteredTransactions); // Graph uses all filtered, ignoring limit for better context
+        renderTransactionList(transactionListContainer, displayTransactions, id, emptyStateEl);
+        renderGraph(canvas, account, id, filteredTransactions);
     };
 
     monthSelect.addEventListener('change', updateTransactions);
     yearSelect.addEventListener('change', updateTransactions);
     limitSelect.addEventListener('change', updateTransactions);
 
-    content.querySelector(`#earn-date-${id}`).valueAsDate = new Date();
-    content.querySelector(`#spend-date-${id}`).valueAsDate = new Date();
+    // Initialize Forms
+    setupFormListeners(content, id, 'earn');
+    setupFormListeners(content, id, 'spend');
 
-    content.querySelector(`#earn-btn-${id}`).addEventListener('click', () => {
-        const description = content.querySelector(`#earn-description-${id}`).value.trim();
-        const amount = parseFloat(content.querySelector(`#earn-amount-${id}`).value);
-        let date = content.querySelector(`#earn-date-${id}`).value;
-        if (!date) {
-            date = new Date().toISOString().split('T')[0];
-        }
-        if (!isNaN(amount)) {
-            accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount, timestamp: Date.now() });
-            content.querySelector(`#earn-description-${id}`).value = '';
-            content.querySelector(`#earn-amount-${id}`).value = '';
-            saveState();
-            renderAll(id);
-        }
-    });
-
-    content.querySelector(`#spend-btn-${id}`).addEventListener('click', () => {
-        const description = content.querySelector(`#spend-description-${id}`).value.trim();
-        const amount = parseFloat(content.querySelector(`#spend-amount-${id}`).value);
-        let date = content.querySelector(`#spend-date-${id}`).value;
-        if (!date) {
-            date = new Date().toISOString().split('T')[0];
-        }
-        if (!isNaN(amount)) {
-            accounts[id].transactions.push({ id: crypto.randomUUID(), date, description, amount: -amount, timestamp: Date.now() });
-            content.querySelector(`#spend-description-${id}`).value = '';
-            content.querySelector(`#spend-amount-${id}`).value = '';
-            saveState();
-            renderAll(id);
-        }
-    });
+    // Initial render
     updateTransactions();
 
     return accountBox;
+}
+
+function setupFormListeners(container, accountId, type) {
+    container.querySelector(`#${type}-date-${accountId}`).valueAsDate = new Date();
+    
+    container.querySelector(`#${type}-btn-${accountId}`).addEventListener('click', () => {
+        const descriptionInput = container.querySelector(`#${type}-description-${accountId}`);
+        const amountInput = container.querySelector(`#${type}-amount-${accountId}`);
+        const dateInput = container.querySelector(`#${type}-date-${accountId}`);
+        const categorySelect = container.querySelector(`#${type}-category-${accountId}`);
+
+        const rawDescription = descriptionInput.value.trim();
+        const amount = parseFloat(amountInput.value);
+        let date = dateInput.value;
+        const category = categorySelect.value;
+        
+        // Default Description if empty based on category
+        let description = rawDescription;
+        if (!description) {
+            const catList = type === 'earn' ? EARN_CATEGORIES : SPEND_CATEGORIES;
+            description = catList[category] ? catList[category].label : 'Transaction';
+        }
+
+        if (!date) {
+            date = new Date().toISOString().split('T')[0];
+        }
+
+        if (!isNaN(amount) && amount > 0) {
+            const finalAmount = type === 'earn' ? amount : -amount;
+            
+            accounts[accountId].transactions.push({ 
+                id: crypto.randomUUID(), 
+                date, 
+                description, 
+                amount: finalAmount, 
+                category, // New Field
+                timestamp: Date.now() 
+            });
+
+            // Reset Form
+            descriptionInput.value = '';
+            amountInput.value = '';
+            
+            saveState();
+            renderAll(accountId);
+        } else {
+            showModalAlert("Please enter a valid amount greater than 0.");
+        }
+    });
+}
+
+function renderTransactionList(container, transactions, accountId, emptyStateEl) {
+    container.innerHTML = '';
+    
+    if (transactions.length === 0) {
+        container.style.display = 'none';
+        emptyStateEl.style.display = 'block';
+        return;
+    }
+    
+    container.style.display = 'block';
+    emptyStateEl.style.display = 'none';
+
+    // Group by Date
+    const grouped = {};
+    transactions.forEach(tx => {
+        if (!grouped[tx.date]) grouped[tx.date] = [];
+        grouped[tx.date].push(tx);
+    });
+
+    const dates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+    dates.forEach(date => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'transaction-group';
+
+        const dateHeader = document.createElement('div');
+        dateHeader.className = 'date-header';
+        
+        // Pretty Date Formatting
+        const d = new Date(date);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const dMidnight = new Date(d);
+        dMidnight.setHours(0,0,0,0);
+        
+        const diffTime = today - dMidnight;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+        let label = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        if (diffDays === 0) label = 'Today';
+        else if (diffDays === 1) label = 'Yesterday';
+
+        dateHeader.textContent = label;
+        groupEl.appendChild(dateHeader);
+
+        const listEl = document.createElement('div');
+        listEl.className = 'transaction-list';
+
+        grouped[date].forEach(tx => {
+            const item = document.createElement('div');
+            item.className = 'transaction-item';
+            
+            const isPositive = tx.amount >= 0;
+            const amountClass = isPositive ? 'text-success' : 'text-danger';
+            const sign = isPositive ? '+' : '';
+            
+            // Icon
+            let icon = isPositive ? '💰' : '💸';
+            let categoryLabel = 'General';
+            
+            // Try to find icon from category
+            // We check both lists because a user might look at history where category exists
+            const earnCat = EARN_CATEGORIES[tx.category];
+            const spendCat = SPEND_CATEGORIES[tx.category];
+            
+            if (earnCat) {
+                icon = earnCat.icon;
+                categoryLabel = earnCat.label;
+            } else if (spendCat) {
+                icon = spendCat.icon;
+                categoryLabel = spendCat.label;
+            } else if (tx.category) {
+                 // Fallback for custom or old category
+                 categoryLabel = tx.category;
+            } else {
+                 // Legacy transaction support
+                 if (isPositive) { categoryLabel = 'Income'; icon = '💰'; }
+                 else { categoryLabel = 'Expense'; icon = '💸'; }
+            }
+
+            item.innerHTML = `
+                <div class="d-flex align-items-center w-100 overflow-hidden">
+                    <div class="tx-icon">${icon}</div>
+                    <div class="tx-details">
+                        <div class="tx-description">${tx.description}</div>
+                        <div class="tx-category">${categoryLabel}</div>
+                    </div>
+                    <div class="tx-amount ${amountClass}">${sign}${formatCurrency(Math.abs(tx.amount))}</div>
+                    <div class="tx-actions">
+                         <button class="btn btn-sm btn-link text-muted p-0 delete-transaction-btn" 
+                                data-account-id="${accountId}" 
+                                data-transaction-id="${tx.id}"
+                                title="Delete">
+                            ❌
+                        </button>
+                    </div>
+                </div>
+            `;
+            listEl.appendChild(item);
+        });
+
+        groupEl.appendChild(listEl);
+        container.appendChild(groupEl);
+    });
 }
 
 export function calculateGraphData(transactions, daysToDisplay = 30) {
@@ -447,7 +642,7 @@ function renderGraph(canvas, account, id, transactions) {
     last30Days.setDate(today.getDate() - 30);
 
     const txSource = transactions || account.transactions.filter(tx => new Date(tx.date) >= last30Days);
-    const displayDays = transactions ? transactions.length : 30; // Heuristic from original code
+    const displayDays = transactions ? transactions.length : 30;
 
     const { labels, data } = calculateGraphData(txSource, displayDays);
 
@@ -462,15 +657,26 @@ function renderGraph(canvas, account, id, transactions) {
             datasets: [{
                 label: `${account.name} Balance`,
                 data: data,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 1,
-                fill: false
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 2,
+                tension: 0.3, // Curve the line slightly
+                fill: true,
+                pointRadius: 0,
+                pointHitRadius: 10
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
             scales: {
+                x: { display: false },
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    grid: { borderDash: [5, 5] }
                 }
             }
         }
