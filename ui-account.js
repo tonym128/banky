@@ -5,6 +5,7 @@ import { resizeImage } from './utils.js';
 
 let charts = {};
 let currentAccountId = null;
+let currentGoalId = null;
 
 const EARN_CATEGORIES = {
     'allowance': { label: 'Allowance', icon: '💸' },
@@ -35,6 +36,21 @@ export function initAccountUI() {
     const removeImageLink = document.getElementById('remove-image-link');
     const editAccountImageInput = document.getElementById('edit-account-image');
 
+    // Allowance UI
+    const allowanceLink = document.getElementById('allowance-link');
+    const allowanceModalEl = document.getElementById('allowance-modal');
+    const allowanceModal = new bootstrap.Modal(allowanceModalEl);
+    const allowanceActiveCheck = document.getElementById('allowance-active');
+    const allowanceAmountInput = document.getElementById('allowance-amount');
+    const allowanceIntervalSelect = document.getElementById('allowance-interval');
+    const saveAllowanceBtn = document.getElementById('save-allowance-btn');
+
+    // Goals UI
+    const saveGoalBtn = document.getElementById('save-goal-btn');
+    const transferModalEl = document.getElementById('transfer-modal');
+    const transferModal = new bootstrap.Modal(transferModalEl);
+    
+    // Add Account Logic
     addAccountBtn.addEventListener('click', async () => {
         const name = accountNameInput.value.trim();
         const imageFile = accountImageInput.files[0];
@@ -52,7 +68,7 @@ export function initAccountUI() {
             }
             
             const id = Date.now().toString();
-            accounts[id] = { name, transactions: [], image };
+            accounts[id] = { name, transactions: [], goals: [], image };
             accountNameInput.value = '';
             accountImageInput.value = '';
             saveState();
@@ -63,6 +79,7 @@ export function initAccountUI() {
         }
     });
 
+    // Account Context Menu
     removeAccountLink.addEventListener('click', (e) => {
         e.preventDefault();
         accountContextMenu.hide();
@@ -90,6 +107,66 @@ export function initAccountUI() {
         accountContextMenu.hide();
     });
 
+    allowanceLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        accountContextMenu.hide();
+        if (currentAccountId) {
+            const account = accounts[currentAccountId];
+            const allowance = account.allowance || { active: false, amount: '', interval: 'weekly' };
+            
+            allowanceActiveCheck.checked = allowance.active;
+            allowanceAmountInput.value = allowance.amount;
+            allowanceIntervalSelect.value = allowance.interval;
+            
+            // Toggle form visibility
+            const form = document.getElementById('allowance-form');
+            if (allowance.active) {
+                form.style.opacity = '1';
+                form.style.pointerEvents = 'auto';
+            } else {
+                form.style.opacity = '0.5';
+                form.style.pointerEvents = 'none';
+            }
+
+            allowanceModal.show();
+        }
+    });
+
+    allowanceActiveCheck.addEventListener('change', () => {
+        const form = document.getElementById('allowance-form');
+        if (allowanceActiveCheck.checked) {
+            form.style.opacity = '1';
+            form.style.pointerEvents = 'auto';
+        } else {
+            form.style.opacity = '0.5';
+            form.style.pointerEvents = 'none';
+        }
+    });
+
+    saveAllowanceBtn.addEventListener('click', () => {
+        if (currentAccountId) {
+            const active = allowanceActiveCheck.checked;
+            const amount = parseFloat(allowanceAmountInput.value);
+            const interval = allowanceIntervalSelect.value;
+
+            if (active && (isNaN(amount) || amount <= 0)) {
+                showModalAlert("Please enter a valid allowance amount.");
+                return;
+            }
+
+            accounts[currentAccountId].allowance = {
+                active,
+                amount,
+                interval,
+                nextRun: Date.now() + (interval === 'monthly' ? 30 : 7) * 24 * 60 * 60 * 1000 // Set first run to next cycle
+            };
+            
+            saveState();
+            allowanceModal.hide();
+            showModalAlert("Allowance settings saved. The first payment will occur in the next cycle.", "Saved");
+        }
+    });
+
     editAccountImageInput.addEventListener('change', async () => {
         const file = editAccountImageInput.files[0];
         if (file && currentAccountId) {
@@ -105,6 +182,7 @@ export function initAccountUI() {
         }
     });
 
+    // Delete Transaction Handler
     accountsContainer.addEventListener('click', (e) => {
         const deleteBtn = e.target.closest('.delete-transaction-btn');
         if (deleteBtn) {
@@ -123,6 +201,136 @@ export function initAccountUI() {
             }, 'Delete Transaction');
         }
     });
+
+    // Add Goal Logic
+    saveGoalBtn.addEventListener('click', () => {
+        if (!currentAccountId) return;
+        
+        const name = document.getElementById('goal-name').value.trim();
+        const target = parseFloat(document.getElementById('goal-target').value);
+        const iconInput = document.querySelector('input[name="goal-icon"]:checked');
+        const icon = iconInput ? iconInput.value : '🎯';
+
+        if (name && !isNaN(target)) {
+            if (!accounts[currentAccountId].goals) accounts[currentAccountId].goals = [];
+            
+            accounts[currentAccountId].goals.push({
+                id: crypto.randomUUID(),
+                name,
+                target,
+                icon,
+                created: Date.now()
+            });
+            saveState();
+            renderAll(currentAccountId);
+            
+            // Cleanup
+            document.getElementById('goal-name').value = '';
+            document.getElementById('goal-target').value = '';
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('add-goal-modal'));
+            modal.hide();
+        }
+    });
+
+    // Transfer Modal Logic
+    document.getElementById('btn-contribute').addEventListener('click', () => handleTransfer(true, transferModal));
+    document.getElementById('btn-withdraw').addEventListener('click', () => handleTransfer(false, transferModal));
+    
+    document.getElementById('btn-delete-goal').addEventListener('click', () => {
+        if (currentAccountId && currentGoalId) {
+            // Confirm first
+            showModalConfirm("Delete this goal? Money will be returned to your wallet.", () => {
+                handleGoalAction(currentAccountId, currentGoalId, 'delete');
+                transferModal.hide();
+            }, "Delete Goal");
+        }
+    });
+
+    document.getElementById('btn-complete-goal').addEventListener('click', () => {
+        if (currentAccountId && currentGoalId) {
+            showModalConfirm("Hooray! Did you reach your goal? The goal will be closed.", () => {
+                handleGoalAction(currentAccountId, currentGoalId, 'complete');
+                transferModal.hide();
+            }, "Complete Goal");
+        }
+    });
+}
+
+function handleGoalAction(accountId, goalId, action) {
+    const account = accounts[accountId];
+    const goalIndex = account.goals.findIndex(g => g.id === goalId);
+    if (goalIndex === -1) return;
+    
+    const goal = account.goals[goalIndex];
+
+    if (action === 'delete') {
+        // Calculate balance to refund
+        const goalBalance = account.transactions
+            .filter(tx => !tx.deleted && tx.goalId === goalId)
+            .reduce((sum, tx) => sum - tx.amount, 0);
+        
+        if (goalBalance > 0) {
+            account.transactions.push({
+                id: crypto.randomUUID(),
+                date: new Date().toISOString().split('T')[0],
+                description: `Refund: ${goal.name}`,
+                amount: goalBalance, // Positive amount back to wallet
+                category: 'goals',
+                timestamp: Date.now()
+            });
+        }
+    } else if (action === 'complete') {
+        // Optional: Add a "Goal Completed" marker transaction if desired, 
+        // but currently we just leave the history as is (money spent).
+    }
+
+    // Remove the goal
+    account.goals.splice(goalIndex, 1);
+    
+    saveState();
+    renderAll(accountId);
+}
+
+function handleTransfer(isDeposit, modal) {
+    const amount = parseFloat(document.getElementById('transfer-amount').value);
+    
+    if (!currentAccountId || !currentGoalId) return;
+    if (isNaN(amount) || amount <= 0) {
+        showModalAlert("Please enter a valid amount.");
+        return;
+    }
+
+    const account = accounts[currentAccountId];
+    const goal = account.goals.find(g => g.id === currentGoalId);
+    if (!goal) return;
+
+    // Logic:
+    // Deposit to Goal: Subtract from Main, Add to Goal (Tx Amount: -X, GoalID: Y)
+    // Withdraw from Goal: Add to Main, Subtract from Goal (Tx Amount: +X, GoalID: Y)
+    
+    // BUT: The Goal ID on a transaction implies it belongs to the goal.
+    // If I spend money from my main wallet to put in goal, it's an expense.
+    // If I take money from goal back to wallet, it's income.
+    
+    const finalAmount = isDeposit ? -amount : amount;
+    const description = isDeposit ? `Saved for ${goal.name}` : `Withdrew from ${goal.name}`;
+    
+    account.transactions.push({
+        id: crypto.randomUUID(),
+        date: new Date().toISOString().split('T')[0],
+        description: description,
+        amount: finalAmount,
+        category: 'goals',
+        goalId: goal.id,
+        timestamp: Date.now()
+    });
+
+    saveState();
+    renderAll(currentAccountId);
+    
+    document.getElementById('transfer-amount').value = '';
+    modal.hide();
 }
 
 export function renderAll(accountId = null) {
@@ -237,6 +445,72 @@ function renderTransactionForm(type, accountId) {
     `;
 }
 
+function renderGoals(container, accountId, account) {
+    container.innerHTML = '';
+    const goals = account.goals || [];
+    
+    if (goals.length === 0) return; // Don't show section if no goals
+
+    const header = document.createElement('h3');
+    header.className = 'h5 fw-bold mb-3';
+    header.textContent = 'Savings Goals';
+    container.appendChild(header);
+
+    const row = document.createElement('div');
+    row.className = 'row g-3';
+
+    goals.forEach(goal => {
+        // Calculate Balance
+        // Sum of all transactions linked to this goal. 
+        // Note: Contribution is negative in main account (-$10), so it's +$10 in Goal.
+        // Withdrawal is positive in main account (+$10), so it's -$10 in Goal.
+        const goalBalance = account.transactions
+            .filter(tx => !tx.deleted && tx.goalId === goal.id)
+            .reduce((sum, tx) => sum - tx.amount, 0); // Invert amount
+
+        const percent = Math.min(100, Math.max(0, (goalBalance / goal.target) * 100));
+        
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4';
+        
+        col.innerHTML = `
+            <div class="card h-100 border-0 shadow-sm goal-card" role="button">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fs-4">${goal.icon}</div>
+                        <div class="fw-bold ${percent >= 100 ? 'text-success' : 'text-primary'}">${formatCurrency(goalBalance)}</div>
+                    </div>
+                    <h6 class="card-title mb-2 text-truncate">${goal.name}</h6>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar ${percent >= 100 ? 'bg-success' : 'bg-primary'}" role="progressbar" style="width: ${percent}%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <small class="text-muted" style="font-size: 0.7rem;">Target: ${formatCurrency(goal.target)}</small>
+                        <small class="text-muted" style="font-size: 0.7rem;">${Math.round(percent)}%</small>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        col.querySelector('.goal-card').addEventListener('click', () => {
+            currentAccountId = accountId;
+            currentGoalId = goal.id;
+            
+            // Populate Modal
+            document.getElementById('transfer-goal-name').textContent = goal.name;
+            document.getElementById('transfer-icon').textContent = goal.icon;
+            
+            const modal = new bootstrap.Modal(document.getElementById('transfer-modal'));
+            modal.show();
+        });
+
+        row.appendChild(col);
+    });
+
+    container.appendChild(row);
+    container.appendChild(document.createElement('hr')); // Separator
+}
+
 function createAccountElement(id, account) {
     const accountBox = document.createElement('div');
     accountBox.className = 'accordion-item border-0 mb-3 shadow-sm rounded-3 overflow-hidden';
@@ -294,7 +568,7 @@ function createAccountElement(id, account) {
     const content = document.createElement('div');
     content.className = 'accordion-body bg-light-subtle';
 
-    // Actions Section
+    // Actions Section (Earn/Spend)
     const earnSpendSection = document.createElement('div');
     earnSpendSection.className = 'row mb-4';
     earnSpendSection.innerHTML = `
@@ -302,6 +576,29 @@ function createAccountElement(id, account) {
         <div class="col-md-6">${renderTransactionForm('spend', id)}</div>
     `;
     content.appendChild(earnSpendSection);
+
+    // Goals Section
+    const goalsContainer = document.createElement('div');
+    goalsContainer.className = 'mb-4';
+    renderGoals(goalsContainer, id, account);
+    content.appendChild(goalsContainer);
+    
+    // Add Goal Button (Small, text only)
+    const addGoalBtnWrapper = document.createElement('div');
+    addGoalBtnWrapper.className = 'text-end mb-4';
+    addGoalBtnWrapper.innerHTML = `
+        <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#add-goal-modal" onclick="window.setCurrentAccount('${id}')">
+            🎯 Add New Goal
+        </button>
+    `;
+    content.appendChild(addGoalBtnWrapper);
+    
+    // Helper for onclick to set context
+    // Ideally we use event listener, but for quick modal trigger inside loop, this helper on window is easy hack
+    // Better way: attach listener
+    addGoalBtnWrapper.querySelector('button').addEventListener('click', () => {
+        currentAccountId = id;
+    });
 
     // Graph Section
     const graphCard = document.createElement('div');
@@ -567,11 +864,12 @@ function renderTransactionList(container, transactions, accountId, emptyStateEl)
             } else if (spendCat) {
                 icon = spendCat.icon;
                 categoryLabel = spendCat.label;
+            } else if (tx.category === 'goals' && tx.goalId) {
+                icon = '🎯';
+                categoryLabel = 'Goal Transfer';
             } else if (tx.category) {
-                 // Fallback for custom or old category
                  categoryLabel = tx.category;
             } else {
-                 // Legacy transaction support
                  if (isPositive) { categoryLabel = 'Income'; icon = '💰'; }
                  else { categoryLabel = 'Expense'; icon = '💸'; }
             }

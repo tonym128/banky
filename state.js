@@ -138,6 +138,19 @@ export function mergeAccounts(local, cloud, localDeleted, cloudDeleted) {
                     .sort((a, b) => new Date(a.date) - new Date(b.date))
             };
 
+            // Merge Goals (Metadata)
+            const localGoals = local[id].goals || [];
+            const cloudGoals = merged[id].goals || [];
+            const goalMap = new Map();
+            
+            cloudGoals.forEach(g => goalMap.set(g.id, g));
+            localGoals.forEach(g => {
+                // Local wins for metadata updates if exists, or adds new
+                // Simplification: We blindly accept local for now as "latest" since we don't track timestamps on goal edits
+                goalMap.set(g.id, g); 
+            });
+            merged[id].goals = Array.from(goalMap.values());
+
             // Only update metadata if local has it
             if (local[id].name) merged[id].name = local[id].name;
             if (local[id].image) merged[id].image = local[id].image;
@@ -378,6 +391,46 @@ export function saveState() {
     localStorage.setItem('accounts', JSON.stringify(accounts));
     localStorage.setItem('deletedAccountIds', JSON.stringify(deletedAccountIds));
     autoExport();
+}
+
+export function checkAllowances() {
+    let changed = false;
+    const now = Date.now();
+    const WEEK = 7 * 24 * 60 * 60 * 1000;
+    const MONTH = 30 * 24 * 60 * 60 * 1000; // Approx
+
+    for (const id in accounts) {
+        const account = accounts[id];
+        if (account.allowance && account.allowance.active && account.allowance.amount > 0) {
+            let nextRun = account.allowance.nextRun || now;
+            
+            if (now >= nextRun) {
+                // Determine interval
+                const interval = account.allowance.interval === 'monthly' ? MONTH : WEEK;
+                
+                // Add Transaction
+                account.transactions.push({
+                    id: crypto.randomUUID(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: 'Allowance',
+                    amount: parseFloat(account.allowance.amount),
+                    category: 'allowance',
+                    timestamp: now
+                });
+
+                // Update next run
+                // Catch up logic: If way behind, just set to next interval from now to avoid spam
+                account.allowance.nextRun = now + interval;
+                changed = true;
+            }
+        }
+    }
+
+    if (changed) {
+        console.log("Allowances processed.");
+        saveState();
+        PubSub.publish(EVENTS.STATE_UPDATED);
+    }
 }
 
 window.addEventListener('online', () => {

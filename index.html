@@ -182,6 +182,80 @@
             </div>
         </div>
 
+        <!-- Add Goal Modal -->
+        <div class="modal fade" id="add-goal-modal" tabindex="-1" aria-labelledby="addGoalModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addGoalModalLabel">New Savings Goal</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="goal-name" class="form-label">Goal Name</label>
+                            <input type="text" id="goal-name" class="form-control mb-2" placeholder="e.g. New Bike">
+                            
+                            <label for="goal-target" class="form-label">Target Amount ($)</label>
+                            <input type="number" id="goal-target" class="form-control mb-2" placeholder="0.00">
+
+                            <label class="form-label">Icon</label>
+                            <div class="d-flex gap-2 overflow-auto py-2" id="goal-icon-selector">
+                                <input type="radio" class="btn-check" name="goal-icon" id="icon-1" value="🚲" checked>
+                                <label class="btn btn-outline-secondary rounded-circle p-2" for="icon-1">🚲</label>
+                                
+                                <input type="radio" class="btn-check" name="goal-icon" id="icon-2" value="🎮">
+                                <label class="btn btn-outline-secondary rounded-circle p-2" for="icon-2">🎮</label>
+
+                                <input type="radio" class="btn-check" name="goal-icon" id="icon-3" value="🧸">
+                                <label class="btn btn-outline-secondary rounded-circle p-2" for="icon-3">🧸</label>
+
+                                <input type="radio" class="btn-check" name="goal-icon" id="icon-4" value="🎸">
+                                <label class="btn btn-outline-secondary rounded-circle p-2" for="icon-4">🎸</label>
+
+                                <input type="radio" class="btn-check" name="goal-icon" id="icon-5" value="📱">
+                                <label class="btn btn-outline-secondary rounded-circle p-2" for="icon-5">📱</label>
+
+                                <input type="radio" class="btn-check" name="goal-icon" id="icon-6" value="🏖️">
+                                <label class="btn btn-outline-secondary rounded-circle p-2" for="icon-6">🏖️</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                         <button id="save-goal-btn" class="btn btn-primary">Create Goal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transfer/Contribute Modal -->
+        <div class="modal fade" id="transfer-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fs-6 text-uppercase text-muted">Transfer</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div id="transfer-icon" class="fs-1 mb-2">💰</div>
+                        <h4 id="transfer-goal-name" class="mb-3"></h4>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">$</span>
+                            <input type="number" id="transfer-amount" class="form-control form-control-lg text-center" placeholder="0.00" autofocus>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button id="btn-contribute" class="btn btn-success">Save (Deposit)</button>
+                            <button id="btn-withdraw" class="btn btn-outline-primary">Withdraw</button>
+                        </div>
+                        <div class="mt-3 pt-3 border-top d-flex justify-content-between">
+                             <button id="btn-delete-goal" class="btn btn-link btn-sm text-danger text-decoration-none">🗑️ Delete</button>
+                             <button id="btn-complete-goal" class="btn btn-link btn-sm text-success text-decoration-none">🏆 Complete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Account Context Menu Modal -->
         <div class="modal fade" id="account-context-menu" tabindex="-1" aria-labelledby="accountContextMenuLabel" aria-hidden="true">
             <div class="modal-dialog modal-sm">
@@ -193,8 +267,46 @@
                     <div class="modal-body">
                         <a href="#" id="add-edit-image-link" class="d-block mb-2">Add/Edit Image</a>
                         <a href="#" id="remove-image-link" class="d-block mb-2">Remove Image</a>
+                        <a href="#" id="allowance-link" class="d-block mb-2">Allowance Settings</a>
                         <a href="#" id="remove-account-link" class="d-block text-danger">Remove Account</a>
                         <input type="file" id="edit-account-image" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Allowance Modal -->
+        <div class="modal fade" id="allowance-modal" tabindex="-1" aria-labelledby="allowanceModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="allowanceModalLabel">Allowance</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="allowance-active">
+                            <label class="form-check-label" for="allowance-active">Enable Allowance</label>
+                        </div>
+                        <div id="allowance-form">
+                            <div class="mb-3">
+                                <label class="form-label">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" id="allowance-amount" class="form-control" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Interval</label>
+                                <select id="allowance-interval" class="form-select">
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary w-100" id="save-allowance-btn">Save</button>
                     </div>
                 </div>
             </div>
