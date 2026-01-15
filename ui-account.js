@@ -309,7 +309,9 @@ function createAccountElement(id, account) {
     graphCard.innerHTML = `
         <div class="card-body">
              <h6 class="card-subtitle mb-3 text-muted text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Balance History</h6>
-             <canvas></canvas>
+             <div style="position: relative; height: 250px;">
+                <canvas></canvas>
+             </div>
         </div>
     `;
     content.appendChild(graphCard);
